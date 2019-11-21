@@ -1,0 +1,14 @@
+torch
+matplotlib
+tensorflow
+numpy
+inflect
+librosa
+scipy
+tensorboardX
+Unidecode
+pillow
+magenta
+
+# djitw
+# apex

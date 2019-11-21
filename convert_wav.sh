@@ -1,0 +1,1 @@
+for f in *.wav; do sox -t wav "$f" -t wav -b 16 -c 1 -r 22050 "converted/${f}" ; done
