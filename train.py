@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 someModel = None
 training_folders = ["C:/Users/simon/Documents/MIR/genres/hiphop/wav"]
 scores = ["C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv"]
-output_directory = "C:/Users/simon/Documents/MIR/genres/"
+output_directory = "C:/Users/simon/djjudge/"
 
 
 def load_checkpoint(checkpoint_path, model, optimizer):
