@@ -5,12 +5,12 @@ install Nvidia's Apex package
 
 pip install -r requirements.txt
 
-### To train the convolutional Variational Autoencoder (VAE) 
+### Train the convolutional Variational Autoencoder (VAE) 
 (Before doing this, the training_folders must be changed with paths of folders containing .wav files only)
 
 python train_ae.py
 
-### To train the 1D-CNN (to be verified, might need small modifications)
+### Train the 1D-CNN (to be verified, might need small modifications)
 (Before doing this, the training_folders must be changed with paths of folders containing .wav files only and scores should point to the scores files, in the same order)
 
 python train.py
