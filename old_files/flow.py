@@ -114,27 +114,20 @@ class NormalizingFlows(nn.Module):
     """
     Presents a sequence of normalizing flows as a torch.nn.Module.
     """
-    def __init__(self, in_features, auxiliary, n_flows=1, h_last_dim=None, flow_type=PlanarNormalizingFlow):
+    def __init__(self, in_features, n_flows=1, h_last_dim=None, flow_type=PlanarNormalizingFlow):
         self.h_last_dim = h_last_dim
         self.flows = []
         self.flows_a = []
         self.n_flows = n_flows
         self.flow_type = "nf"
-        self.auxiliary = auxiliary
         for i, features in enumerate(reversed(in_features)):
-            if auxiliary:
-                self.flows_a += [nn.ModuleList([flow_type(features).cuda() for _ in range(n_flows)])]
-            else:
-                self.flows += [nn.ModuleList([flow_type(features).cuda() for _ in range(n_flows)])]
+            self.flows += [nn.ModuleList([flow_type(features).cuda() for _ in range(n_flows)])]
 
         super(NormalizingFlows, self).__init__()
 
-    def forward(self, z, i, auxiliary):
+    def forward(self, z, i=0):
         log_det_jacobian = []
-        if not auxiliary:
-            flows = self.flows
-        else:
-            flows = self.flows_a
+        flows = self.flows
         for flow in flows[i]:
             z, j = flow(z)
             log_det_jacobian.append(j)

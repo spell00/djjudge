@@ -1,0 +1,329 @@
+from models.supevised.simple1DCNN import Simple1DCNN
+from utils.CycleAnnealScheduler import CycleScheduler
+from torch.utils.data import DataLoader
+from data_preparation.load_wavs_as_tensor import Wave2tensor
+import torch.nn as nn
+import argparse
+import os
+import torch
+import numpy as np
+from tensorboardX import SummaryWriter
+import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
+from utils.utils import create_missing_folders
+
+training_folders = [
+    "C:/Users/simon/Documents/MIR/genres/blues/wav",
+    "C:/Users/simon/Documents/MIR/genres/classical/wav",
+    "C:/Users/simon/Documents/MIR/genres/country/wav",
+    "C:/Users/simon/Documents/MIR/genres/disco/wav",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
+    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
+    "C:/Users/simon/Documents/MIR/genres/metal/wav",
+    "C:/Users/simon/Documents/MIR/genres/pop/wav",
+    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
+    "C:/Users/simon/Documents/MIR/genres/rock/wav",
+]
+scores = [
+    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+]
+output_directory = "C:/Users/simon/djjudge/"
+
+
+def rand_jitter(arr):
+    stdev = .01*(max(arr)-min(arr))
+    return arr + np.random.randn(len(arr)) * stdev
+
+
+def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100):
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
+
+    scores_sorted_lists = [sorted(rand_jitter(np.array(scores[i * offset:(i + 1) * offset]))) for i in range(10)]
+    genres = ["blues", "classical", "country", "disco", "hiphop", "jazz", "metal", "pop", "reggae", "rock"]
+    colors = ['darkorange', 'cornflowerblue', 'darkviolet', 'chocolate', 'yellowgreen', 'lightseagreen',
+              'forestgreen', 'crimson', 'coral', 'wheat']
+    box = ax21.boxplot(scores_sorted_lists, vert=0, patch_artist=True, labels=genres)  # plotting t, a separately
+    for patch, color in zip(box['boxes'], colors):
+        patch.set_facecolor(color)
+
+    handle, label = ax21.get_legend_handles_labels()
+    ax21.legend(handle, label)
+    fig2.tight_layout()
+    pylab.savefig(results_path + "/plots/" + filename)
+
+
+def performance_per_score(predicted_values, target_values, results_path, filename="scores_performance"):
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
+    predicted_values = np.array(predicted_values)
+    target_values = np.array(target_values)
+    ax21.set_ylim([0, 1])
+    #ax21.set_xlim([0, 1])
+    plt.scatter(target_values, rand_jitter(predicted_values), facecolors='none', edgecolors='r')  # plotting t, a separately
+    ax21.hlines(np.mean(predicted_values), xmin=0, xmax=1, colors='b', label='Predicted values average')
+    ax21.hlines(np.mean(target_values), xmin=0, xmax=1, colors='k', label='Target values average')
+    plt.plot(np.unique(target_values),
+             np.poly1d(np.polyfit(target_values, predicted_values, 1))(np.unique(target_values)), label="Best fit")
+    ident = [0.0, 1.0]
+    ax21.plot(ident, ident, color="g", label='Identity line')
+    handle, label = ax21.get_legend_handles_labels()
+    ax21.legend(handle, label)
+    fig2.tight_layout()
+    pylab.savefig(results_path + "/plots/" + filename)
+
+
+def plot_data_distribution(train_scores, valid_scores, results_path, filename="scores_data_distribution"):
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
+
+    scores_train = sorted(train_scores)
+    scores_valid = sorted(valid_scores)
+
+    ax21.plot(scores_train, 'b--', label='Train')  # plotting t, a separately
+    ax21.plot(scores_valid, 'r--', label='Valid')  # plotting t, a separately
+    ax21.hlines(np.mean(train_scores), xmin=0, xmax=900, colors='b', label='Train mean')
+    ax21.hlines(np.mean(valid_scores), xmin=0, xmax=900, colors='r', label='Valid mean')
+    # ax21.vlines(500, ymin=0, ymax=1, colors='k')
+    ax21.set_xlabel('epochs')
+    ax21.set_ylabel('Loss')
+    handle, label = ax21.get_legend_handles_labels()
+    ax21.legend(handle, label)
+    fig2.tight_layout()
+    pylab.savefig(results_path + "/plots/" + filename)
+
+
+def plot_performance(running_loss, valid_loss, results_path, filename):
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
+    ax21.plot(running_loss, 'b-', label='Train')  # plotting t, a separately
+    ax21.plot(valid_loss, 'r-', label='Valid')  # plotting t, a separately
+    ax21.set_xlabel('epochs')
+    ax21.set_ylabel('Loss')
+    handle, label = ax21.get_legend_handles_labels()
+    ax21.legend(handle, label)
+    fig2.tight_layout()
+    # pylab.show()
+    create_missing_folders(results_path + "/plots/")
+    try:
+        pylab.savefig(results_path + "/plots/" + filename)
+    except:
+        pass
+    plt.close()
+
+
+def load_checkpoint(checkpoint_path, model, optimizer):
+    assert os.path.isfile(checkpoint_path)
+    checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+    epoch = checkpoint_dict['epoch']
+    optimizer.load_state_dict(checkpoint_dict['optimizer'])
+    model_for_loading = checkpoint_dict['model']
+    model.load_state_dict(model_for_loading.state_dict())
+    print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
+    return model, optimizer, epoch
+
+
+def load_checkpoint_for_test(checkpoint_path, model):
+    assert os.path.isfile(checkpoint_path)
+    checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+    model_for_loading = checkpoint_dict['model']
+    model.load_state_dict(model_for_loading.state_dict())
+    print("Loaded checkpoint '{}')".format(checkpoint_path))
+    return model
+
+
+def save_checkpoint(model, optimizer, learning_rate, epoch, filepath):
+    print("Saving model and optimizer state at epoch {} to {}".format(
+        epoch, filepath))
+    model_for_saving = Simple1DCNN().cuda()
+    model_for_saving.load_state_dict(model.state_dict())
+    torch.save({'model': model_for_saving,
+                'epoch': epoch,
+                'val_loss': epoch,
+                'optimizer': optimizer.state_dict(),
+                'learning_rate': learning_rate}, filepath)
+
+
+def test(checkpoint_path=None):
+    torch.manual_seed(42)
+    model = Simple1DCNN().cuda()
+    model.random_init()
+    criterion = nn.MSELoss()
+    # Load checkpoint if one exists
+    epoch = 0
+    if checkpoint_path is not None:
+        model, optimizer = load_checkpoint_for_test(checkpoint_path, model)
+        epoch += 1  # next epoch is epoch + 1
+
+    valid_set = Wave2tensor(training_folders, scores, segment_length=300000, valid=True)
+    valid_loader = DataLoader(valid_set, num_workers=0,
+                            shuffle=False,
+                            batch_size=1,
+                            pin_memory=False,
+                            drop_last=False)
+
+
+    model.eval()
+    valid_abs = []
+    for i, batch in enumerate(valid_loader):
+        audio, targets, sampling_rate = batch
+        audio = audio.cuda()
+        outputs = model(audio.unsqueeze(1)).squeeze()
+        valid_abs += [torch.mean(torch.abs_(outputs - targets.cuda())).item()]
+    boxplots_genres(valid_abs, results_path="figures/boxplots", filename="boxplot_valid_performance_per_genre",
+                    offset=20)
+    del valid_abs
+
+
+def train(batch_size=8,
+          epochs=100,
+          learning_rate=1e-4,
+          fp16_run=False,
+          checkpoint_path=None,
+          epochs_per_checkpoint=1):
+    torch.manual_seed(42)
+    model = Simple1DCNN().cuda()
+    model.random_init()
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
+    if fp16_run:
+        from apex import amp
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O1')
+
+    # Load checkpoint if one exists
+    epoch = 0
+    if checkpoint_path is not None:
+        model, optimizer, epoch = load_checkpoint(checkpoint_path, model, optimizer)
+        epoch += 1  # next epoch is epoch + 1
+
+    all_set = Wave2tensor(training_folders, scores, segment_length=300000, all=True, valid=False)
+    boxplots_genres(all_set.scores, results_path="figures")
+    del all_set
+    train_set = Wave2tensor(training_folders, scores, segment_length=300000)
+
+    valid_set = Wave2tensor(training_folders, scores, segment_length=300000, valid=True)
+
+    plot_data_distribution(train_set.scores, valid_set.scores, results_path="figures")
+    train_loader = DataLoader(train_set, num_workers=0,
+                              shuffle=True,
+                              batch_size=batch_size,
+                              pin_memory=False,
+                              drop_last=True)
+    valid_loader = DataLoader(valid_set, num_workers=0,
+                              shuffle=False,
+                              batch_size=batch_size,
+                              pin_memory=False,
+                              drop_last=False)
+
+    # Get shared output_directory ready
+    logger = SummaryWriter(os.path.join(output_directory, 'logs'))
+    epoch_offset = max(1, epoch)
+    lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=epochs * len(train_loader))
+    losses = {
+        "train": {
+            "abs_error": [],
+            "mse": []
+        },
+        "valid": {
+            "abs_error": [],
+            "mse": [],
+        }
+    }
+    # train_losses = []
+    # train_mean_diffs = []
+    # valid_mean_diffs = []
+    # valid_losses = []
+    for epoch in range(epoch_offset, epochs):
+        loss_list = {
+            "train": {
+                "abs_error": [],
+                "mse": [],
+                "targets_list": [],
+                "outputs_list": [],
+            },
+            "valid": {
+                "valid_abs_all": [],
+                "abs_error": [],
+                "mse": [],
+                "targets_list": [],
+                "outputs_list": [],
+            }
+        }
+
+        model.train()
+        for i, batch in enumerate(train_loader):
+            model.zero_grad()
+            audio, targets, sampling_rate = batch
+            audio = torch.autograd.Variable(audio).cuda()
+            outputs = model(audio.unsqueeze(1)).squeeze()
+            loss = criterion(outputs, targets.cuda())
+            logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
+
+            loss_list["train"]["outputs_list"].extend(outputs.detach().cpu().numpy())
+            loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
+            loss_list["train"]["mse"] += [loss.item()]
+            loss_list["train"]["abs_error"] += [torch.mean(torch.abs_(outputs - targets.cuda())).item()]
+            if fp16_run:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                loss.backward()
+
+            optimizer.step()
+            lr_schedule.step()
+            del loss
+        losses["train"]["mse"] += [np.mean(loss_list["train"]["mse"])]
+        losses["train"]["abs_error"] += [float(np.mean(loss_list["train"]["abs_error"]))]
+        performance_per_score(loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"], results_path="figures",
+                              filename="scores_performance_train.png")
+        del loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"]
+        if epoch % epochs_per_checkpoint == 0:
+            print("Epoch: {}:\tTrain Loss: {:.3f}, {:.3f}".format(epoch, losses["train"]["mse"][-1],
+                                                                  losses["train"]["abs_error"][-1], torch.std(outputs)))
+
+        model.eval()
+        for i, batch in enumerate(valid_loader):
+            audio, targets, sampling_rate = batch
+            audio = audio.cuda()
+            outputs = model(audio.unsqueeze(1)).squeeze()
+            loss = criterion(outputs, targets.cuda())
+            logger.add_scalar('training loss', np.log2(loss.item()), i + len(train_loader) * epoch)
+            loss_list["valid"]["outputs_list"].extend(outputs.detach().cpu().numpy())
+            loss_list["valid"]["targets_list"].extend(targets.detach().cpu().numpy())
+            loss_list["valid"]["mse"] += [loss.item()]
+            loss_list["valid"]["abs_error"] += [torch.mean(torch.abs_(outputs - targets.cuda())).item()]
+            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs - targets.cuda()).detach().cpu().numpy())
+            del loss
+        losses["valid"]["mse"] += [np.mean(loss_list["valid"]["mse"])]
+        losses["valid"]["abs_error"] += [np.mean(loss_list["valid"]["abs_error"])]
+        boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
+                        filename="boxplot_valid_performance_per_genre_valid.png", offset=20)
+
+        if epoch % epochs_per_checkpoint == 0:
+            checkpoint_path = "{}/classif_ckpt/cnn{}".format(output_directory, epoch)
+            save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path)
+            print("Epoch: {}:\tValid Loss: {:.3f}, {:.3f}".format(epoch, losses["valid"]["mse"][-1],
+                                                                  losses["valid"]["abs_error"][-1],
+                                                                  torch.std(outputs)))
+
+        plot_performance(losses["train"]["mse"], losses["valid"]["mse"], results_path="figures",
+                         filename="training_MSEloss_trace_classification")
+        plot_performance(losses["train"]["abs_error"], losses["valid"]["abs_error"], results_path="figures",
+                         filename="training_mean_abs_diff_trace_classification")
+        performance_per_score(loss_list["valid"]["outputs_list"], loss_list["valid"]["targets_list"], results_path="figures",
+                              filename="scores_performance_valid.png")
+        del loss_list
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    num_gpus = torch.cuda.device_count()
+
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = False
+    train(batch_size=32, epochs=100000)  #, checkpoint_path="classif_ckpt/cnn272")

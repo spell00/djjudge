@@ -4,7 +4,8 @@ import matplotlib.pylab as pylab
 from utils.utils import create_missing_folders
 
 def plot_performance(loss_total,
-                     accuracy,
+                     kl_divs,
+                     losses_recon,
                      shapes,
                      results_path,
                      filename="NoName",
@@ -23,11 +24,15 @@ def plot_performance(loss_total,
     :param verbose:
     :return:
     """
-    fig2, ax21 = plt.subplots()
+
+    handles = []
+    labels = []
+
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
     n = list(range(len(loss_total["train"])))
     try:
-        ax21.plot(loss_total["train"], 'b-', label='Train total loss:' + str(len(shapes["train"])))  # plotting t, a separately
-        ax21.plot(loss_total["valid"], 'g-', label='Valid total loss:' + str(len(shapes["valid"])))  # plotting t, a separately
+        ax21.plot(loss_total["Train total loss"], 'b-', label='Train total loss:' + str(len(shapes["train"])))  # plotting t, a separately
+        ax21.plot(loss_total["Valid loss"], 'g-', label='Valid total loss:' + str(len(shapes["valid"])))  # plotting t, a separately
         #ax21.plot(values["valid"], 'r-', label='Test:' + str(len(labels["valid"])))  # plotting t, a separately
     except:
         ax21.plot(loss_total["train"], 'b-', label='Train total loss:')  # plotting t, a separately
@@ -41,27 +46,31 @@ def plot_performance(loss_total,
 
     ax21.set_xlabel('epochs')
     ax21.set_ylabel('Loss')
-    handles, labels = ax21.get_legend_handles_labels()
-    ax21.legend(handles, labels)
-    if accuracy is not None:
-        ax22 = ax21.twinx()
 
-        #colors = ["b", "g", "r", "c", "m", "y", "k"]
-        # if n_list is not None:
-        #    for i, n in enumerate(n_list):
-        #        ax22.plot(n_list[i], '--', label="Hidden Layer " + str(i))  # plotting t, a separately
-        ax22.set_ylabel('Accuracy')
-        ax22.plot(accuracy["train"], 'c--', label='Train')  # plotting t, a separately
-        ax22.plot(accuracy["valid"], 'k--', label='Valid')  # plotting t, a separately
-        if std_accuracy is not None:
-            ax22.errorbar(x=n, y=accuracy["train"], yerr=[np.array(std_accuracy["train"]), np.array(std_accuracy["train"])],
-                          c="c", label='Train')  # plotting t, a separately
-        if std_accuracy is not None:
-            ax22.errorbar(x=n, y=accuracy["valid"], yerr=[np.array(std_accuracy["valid"]), np.array(std_accuracy["valid"])],
-                          c="k", label='Valid')  # plotting t, a separately
 
-        handles, labels = ax22.get_legend_handles_labels()
-        ax22.legend(handles, labels)
+    ax21.plot(kl_divs["train"], 'c--', label='Train KL div')  # plotting t, a separately
+    ax21.plot(kl_divs["valid"], 'k--', label='Valid KL div')  # plotting t, a separately
+    if std_accuracy is not None:
+        ax21.errorbar(x=n, y=kl_divs["train"], yerr=[np.array(std_accuracy["train"]), np.array(std_accuracy["train"])],
+                      c="c", label='Train')  # plotting t, a separately
+    if std_accuracy is not None:
+        ax21.errorbar(x=n, y=kl_divs["valid"], yerr=[np.array(std_accuracy["valid"]), np.array(std_accuracy["valid"])],
+                      c="k", label='Valid')  # plotting t, a separately
+
+    ax21.plot(losses_recon["train"], 'c', label='Train Recon loss')  # plotting t, a separately
+    ax21.plot(losses_recon["valid"], 'k', label='Valid Recon loss')  # plotting t, a separately
+    if std_accuracy is not None:
+        ax21.errorbar(x=n, y=losses_recon["train"], yerr=[np.array(std_accuracy["train"]), np.array(std_accuracy["train"])],
+                      c="c", label='Train')  # plotting t, a separately
+    if std_accuracy is not None:
+        ax21.errorbar(x=n, y=losses_recon["valid"], yerr=[np.array(std_accuracy["valid"]), np.array(std_accuracy["valid"])],
+                      c="k", label='Valid')  # plotting t, a separately
+
+    handle, label = ax21.get_legend_handles_labels()
+    handles.extend(handle)
+    labels.extend(labels)
+
+    ax21.legend(handle, label)
 
     fig2.tight_layout()
     # pylab.show()

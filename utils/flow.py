@@ -84,7 +84,7 @@ class PlanarFlowLogDetJacobian(nn.Module):
 
 class linIAF(nn.Module):
     # https: // github.com / jmtomczak / vae_vpflows / blob / master / models / VAE_ccLinIAF.py  # L215
-    def __init__(self,z1_size=2):
+    def __init__(self, z1_size=2):
         super(linIAF, self).__init__()
 
         self.z1_size = z1_size

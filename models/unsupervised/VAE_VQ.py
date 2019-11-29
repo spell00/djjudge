@@ -1,11 +1,15 @@
-import torch
 from utils.stochastic import GaussianSample
 from torch.autograd import Variable
-import torch.nn as nn
 import torch.nn.functional as F
 from utils.distributions import log_gaussian, log_standard_gaussian
-from flow import NormalizingFlows, linIAF, PlanarNormalizingFlow
+from old_files.flow import NormalizingFlows
 from utils.masked_layer import GatedConv1d, GatedConvTranspose1d
+from models.unsupervised.VectorQuantizer import *
+in_channels = None
+out_channels = None
+kernel_sizes = None
+strides = None
+
 
 class Stochastic(nn.Module):
     """
@@ -51,48 +55,55 @@ class GaussianSample(Stochastic):
         return self.reparametrize(mu, log_var), mu, log_var
 
 
-class Autoencoder1DCNN(torch.nn.Module):
-    def __init__(self, z_dim=100, flow_type="nf", n_flows=2, gated=True):
-        super(Autoencoder1DCNN, self).__init__()
+class VariationalAutoencoderVQ(torch.nn.Module):
+    def __init__(self, z_dim, in_channels, out_channels, kernel_sizes, strides, dilatations, num_embeddings, flow_type="nf",
+                 n_flows=2, gated=True):
+        super(VariationalAutoencoderVQ, self).__init__()
         self.conv_layers = []
         self.deconv_layers = []
         self.bns = []
-        in_channels = [1, 20, 40, 60, 60, 60]
-        out_channels = [20, 40, 60, 60, 60, 1]
-        kernel_sizes = [5, 5, 5, 5, 5, 1]
-        strides = [3, 3, 3, 3, 3, 1]
+        self.bns_decoder = []
         self.GaussianSample = GaussianSample(z_dim, z_dim)
-        self.relu = torch.nn.ReLU()
-        for ins, outs, ksize, stride in zip(in_channels, out_channels, kernel_sizes, strides):
+        self.relu = torch.nn.PReLU()
+        for ins, outs, ksize, stride, dilats in zip(in_channels, out_channels, kernel_sizes, strides, dilatations):
             if not gated:
                 self.conv_layers += [torch.nn.Conv1d(in_channels=ins, out_channels=outs, kernel_size=ksize,
-                                                     stride=stride)]
+                                                     stride=stride, dilation=dilats)]
             else:
                 self.conv_layers += [GatedConv1d(in_channels=ins, out_channels=outs, kernel_size=ksize, stride=stride,
-                                                 padding=0)]
+                                                 padding=0, dilation=dilats, activation=nn.Tanh())]
 
-            self.bns += [nn.BatchNorm1d(num_features=outs)]
+            self.bns += [nn.BatchNorm1d(num_features=outs).cuda()]
 
-        for ins, outs, ksize, stride in zip(reversed(out_channels), reversed(in_channels),
-                                            reversed(kernel_sizes), reversed(strides)):
+        for ins, outs, ksize, stride, dilats in zip(reversed(out_channels), reversed(in_channels),
+                                            reversed(kernel_sizes), reversed(strides), dilatations):
             if not gated:
                 self.deconv_layers += [torch.nn.ConvTranspose1d(in_channels=ins, out_channels=outs,
-                                                            kernel_size=ksize, stride=stride)]
+                                                                kernel_size=ksize, stride=stride, dilation=dilats)]
             else:
                 self.deconv_layers += [GatedConvTranspose1d(in_channels=ins, out_channels=outs, kernel_size=ksize,
-                                                            stride=stride, padding=0)]
+                                                            stride=stride, padding=0, dilation=dilats,
+                                                            activation=nn.Tanh())]
 
-            self.bns += [nn.BatchNorm1d(num_features=outs)]
+            self.bns_decoder += [nn.BatchNorm1d(num_features=outs).cuda()]
+        self._vq = VectorQuantizer(
+                num_embeddings=64,
+                embedding_dim=z_dim,
+                commitment_cost=0.25,
+                device='cuda'
+            )
 
-        self.dense1 = torch.nn.Linear(in_features=1233, out_features=z_dim)
-        self.dense2 = torch.nn.Linear(in_features=z_dim, out_features=1233)
+        self.dense1 = torch.nn.Linear(in_features=427, out_features=z_dim)
+        self.dense2 = torch.nn.Linear(in_features=z_dim, out_features=427)
+        self.dense1_bn = nn.BatchNorm1d(num_features=z_dim)
+        self.dense2_bn = nn.BatchNorm1d(num_features=427)
         self.dropout = nn.Dropout(0.2)
         self.conv_layers = nn.ModuleList(self.conv_layers)
         self.deconv_layers = nn.ModuleList(self.deconv_layers)
         self.flow_type = flow_type
         self.n_flows = n_flows
         if self.flow_type == "nf":
-            self.flow = PlanarNormalizingFlow(in_features=z_dim)
+            self.flow = NormalizingFlows(in_features=[z_dim], n_flows=n_flows)
 
     def random_init(self):
 
@@ -118,38 +129,45 @@ class Autoencoder1DCNN(torch.nn.Module):
     def encoder(self, x):
         for i in range(len(self.conv_layers)):
             x = self.conv_layers[i](x)
-            x = self.relu(x)
+            # x = self.relu(x)
+            # x = self.bns[i](x)
             # x = self.dropout(x)
-            # x = self.bn1(x)
         x = x.squeeze()
         z = self.dense1(x)
+        z = self.dense1_bn(z)
         z = self.relu(z)
+        z = self.dropout(z)
 
         return z
 
     def decoder(self, z):
-        x = self.dense2(z).unsqueeze(1)
+        z = self.dense2(z)
+        z = self.dense2_bn(z).unsqueeze(1)
+        x = self.relu(z)
+        x = self.dropout(x)
+
         for i in range(len(self.deconv_layers)):
             x = self.deconv_layers[i](x)
-            if i < len(self.deconv_layers) - 1:
-                x = self.relu(x)
+            #  = self.relu(x)
+            # x = self.bns_decoder[i](x)
             # x = self.dropout(x)
-            # x = self.bn1(x)
         # TODO there is 139 / 300000 loss at the end, close enough?
 
         return x
 
     def forward(self, x):
 
-        x = self.encoder(x)
-        z, mu, log_var = self.GaussianSample(x)
-
-        # Kullback-Leibler Divergence
-        kl = self._kld(z, mu, log_var)
+        z = self.encoder(x)
+        # z = self._pre_vq_conv(z)
+        # Vector Quantization
+        vq_loss, quantized, perplexity, _, _, encoding_indices, \
+            losses, _, _, _, concatenated_quantized = self._vq(z.unsqueeze(1),
+                                                               record_codebook_stats=False,
+                                                               compute_distances_if_possible=False)
 
         x = self.decoder(z)
-        log_probs = torch.tanh(x)
-        return log_probs, kl
+        probs = torch.tanh(x)
+        return probs, vq_loss
 
     def sample(self, z, y=None):
         """

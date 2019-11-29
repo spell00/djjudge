@@ -1,18 +1,60 @@
-from models.simple1DCNN import Simple1DCNN
-from CycleAnnealScheduler import CycleScheduler
+from models.supevised.simple1DCNN import Simple1DCNN
+from utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from load_wavs_as_tensor import Wave2tensor
+from data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
 import torch
 import numpy as np
 from tensorboardX import SummaryWriter
+import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
+from utils.utils import create_missing_folders
 
 someModel = None
-training_folders = ["C:/Users/simon/Documents/MIR/genres/hiphop/wav"]
-scores = ["C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv"]
+training_folders = [
+    "C:/Users/simon/Documents/MIR/genres/blues/wav",
+    "C:/Users/simon/Documents/MIR/genres/classical/wav",
+    "C:/Users/simon/Documents/MIR/genres/country/wav",
+    "C:/Users/simon/Documents/MIR/genres/disco/wav",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
+    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
+    "C:/Users/simon/Documents/MIR/genres/metal/wav",
+    "C:/Users/simon/Documents/MIR/genres/pop/wav",
+    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
+    "C:/Users/simon/Documents/MIR/genres/rock/wav",
+]
+scores = [
+    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+]
 output_directory = "C:/Users/simon/djjudge/"
+
+def plot_performance(running_loss, valid_loss, results_path, filename):
+    fig2, ax21 = plt.subplots(figsize=(20, 20))
+    ax21.plot(running_loss, 'b-', label='Train')  # plotting t, a separately
+    ax21.plot(valid_loss, 'r-', label='Valid')  # plotting t, a separately
+    ax21.set_xlabel('epochs')
+    ax21.set_ylabel('Loss')
+    handle, label = ax21.get_legend_handles_labels()
+    ax21.legend(handle, label)
+    fig2.tight_layout()
+    # pylab.show()
+    create_missing_folders(results_path + "/plots/")
+    try:
+        pylab.savefig(results_path + "/plots/" + filename)
+    except:
+        pass
+    plt.close()
 
 
 def load_checkpoint(checkpoint_path, model, optimizer):
@@ -43,7 +85,7 @@ def train(batch_size=8,
           learning_rate=1e-4,
           fp16_run=False,
           checkpoint_path=None,
-          epochs_per_checkpoint=100):
+          epochs_per_checkpoint=1):
     torch.manual_seed(42)
     model = Simple1DCNN().cuda()
     model.random_init()
@@ -78,9 +120,13 @@ def train(batch_size=8,
     logger = SummaryWriter(os.path.join(output_directory, 'logs'))
     epoch_offset = max(1, int(iteration / len(train_loader)))
     lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=epochs * len(train_loader))
-    losses = []
+    train_losses = []
+    train_mean_diffs = []
+    valid_mean_diffs = []
+    valid_losses = []
     for epoch in range(epoch_offset, epochs):
         running_loss = []
+        val_loss = []
         model.train()
         for i, batch in enumerate(train_loader):
             model.zero_grad()
@@ -98,10 +144,12 @@ def train(batch_size=8,
             optimizer.step()
             lr_schedule.step()
             logger.add_scalar('training_loss', reduced_loss, i + len(train_loader) * epoch)
+        train_losses += [np.mean(running_loss)]
+        train_mean_diffs += [float(torch.mean(torch.abs_(outputs-targets.cuda())))]
 
         if epoch % epochs_per_checkpoint == 0:
-            print("Epoch: {}:\tTrain Loss: {:.3f}, {:.3f}".format(epoch, np.mean(running_loss),
-                                                                  float(torch.mean(torch.abs_(outputs-targets.cuda()))),
+            print("Epoch: {}:\tTrain Loss: {:.3f}, {:.3f}".format(epoch, train_losses[-1],
+                                                                  train_mean_diffs[-1],
                                                                   torch.std(outputs)))
 
         model.eval()
@@ -111,18 +159,29 @@ def train(batch_size=8,
             audio = audio.cuda()
             outputs = model(audio.unsqueeze(1)).squeeze()
             loss = criterion(outputs, targets.cuda())
-            losses += [loss.item()]
+            val_loss += [loss.item()]
             reduced_loss = loss.item()
             valid_loss += [loss.item()]
             logger.add_scalar('training loss', np.log2(reduced_loss), i + len(train_loader) * epoch)
+        valid_losses += [np.mean(val_loss)]
+        valid_mean_diffs += [float(torch.mean(torch.abs_(outputs-targets.cuda())))]
 
         if epoch % epochs_per_checkpoint == 0:
             checkpoint_path = "{}/cnn{}".format(output_directory, iteration)
             save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path)
-            print("Epoch: {}:\tValid Loss: {:.3f}, {:.3f}".format(epoch, np.mean(valid_loss),
-                                                                  float(torch.mean(torch.abs_(outputs-targets.cuda()))),
+            print("Epoch: {}:\tValid Loss: {:.3f}, {:.3f}".format(epoch, valid_losses[-1],
+                                                                  valid_mean_diffs[-1],
                                                                   torch.std(outputs)))
 
+        plot_performance(train_losses, valid_losses,
+                         results_path="figures",
+                         filename="training_MSEloss_trace_classification")
+        plot_performance(train_mean_diffs, valid_mean_diffs,
+                         results_path="figures",
+                         filename="training_mean_abs_diff_trace_classification")
+
+def test():
+    pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -130,4 +189,4 @@ if __name__ == "__main__":
 
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = False
-    train(batch_size=16, epochs=100000)
+    train(batch_size=8, epochs=100000)

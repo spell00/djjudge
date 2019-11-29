@@ -43,7 +43,7 @@ class Wave2tensor(torch.utils.data.Dataset):
     """
     All folders must be in the same parent folder
     """
-    def __init__(self, folders, scores_files, segment_length, valid=False):
+    def __init__(self, folders, scores_files, segment_length, valid=False, all=False):
         train_lim = None
         scores = None
         files_list = None
@@ -51,21 +51,29 @@ class Wave2tensor(torch.utils.data.Dataset):
         self.scores = []
         for i, folder in enumerate(folders):
             if scores_files is not None:
-                scores = pd.read_csv(scores_files[i], header=None)[0].to_numpy()
+                try:
+                    scores = pd.read_csv(scores_files[i], header=None)[1].to_numpy()
+                except:
+                    scores = pd.read_csv(scores_files[i], header=None, sep="\t")[1].to_numpy()
+
             files_list = folder_to_list(folder)
             train_lim = int(0.8 * len(files_list))
-            if not valid:
+            if not valid and not all:
                 files_list = files_list[:train_lim]
                 self.audio_files.extend(files_list)
                 if scores_files is not None:
                     scores = scores[:train_lim]
                     self.scores.extend(scores)
-            else:
+            elif not all:
                 files_list = files_list[train_lim:]
                 self.audio_files.extend(files_list)
                 if scores_files is not None:
                     scores = scores[train_lim:]
                     self.scores.extend(scores)
+            else:
+                self.audio_files.extend(files_list)
+                self.scores.extend(scores)
+
         files_list = files_list[train_lim:]
         self.audio_files.extend(files_list)
         if scores_files is None:
@@ -78,7 +86,7 @@ class Wave2tensor(torch.utils.data.Dataset):
         if self.scores is not None:
             targets = self.scores[index]
         else:
-            targets = 0
+            targets = -1
         audio, sampling_rate = load_wav_to_torch(filename)
 
         self.sampling_rate = sampling_rate
