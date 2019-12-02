@@ -1,7 +1,9 @@
 import torch
-from djjudge.train_cnn import *
+from djjudge.models.supervised.simple1DCNN import *
+from djjudge.train_cnn import train
 
 if __name__ == "__main__":
+
     training_folders = [
         "C:/Users/simon/Documents/MIR/genres/blues/wav",
         "C:/Users/simon/Documents/MIR/genres/classical/wav",
@@ -40,4 +42,4 @@ if __name__ == "__main__":
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
           fp16_run=True,
-          checkpoint_path="classif_ckpt/cnn")
+          checkpoint_path="../classif_ckpt/cnn")

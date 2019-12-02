@@ -18,7 +18,7 @@ def rand_jitter(arr):
 
 
 def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100):
-    create_missing_folders(results_path)
+    create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
 
     scores_sorted_lists = [sorted(rand_jitter(np.array(scores[i * offset:(i + 1) * offset]))) for i in range(10)]
@@ -38,7 +38,7 @@ def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100
 
 
 def performance_per_score(predicted_values, target_values, results_path, n, filename="scores_performance", valid=False):
-    create_missing_folders(results_path)
+    create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
     predicted_values = np.array(predicted_values)
     genres = ["blues", "classical", "country", "disco", "hiphop", "jazz", "metal", "pop", "reggae", "rock"]
@@ -70,7 +70,7 @@ def performance_per_score(predicted_values, target_values, results_path, n, file
 
 
 def plot_data_distribution(train_scores, valid_scores, results_path, filename="scores_data_distribution"):
-    create_missing_folders(results_path)
+    create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
 
     scores_train = sorted(train_scores)
@@ -91,7 +91,7 @@ def plot_data_distribution(train_scores, valid_scores, results_path, filename="s
 
 
 def plot_performance(running_loss, valid_loss, results_path, filename):
-    create_missing_folders(results_path)
+    create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
     ax21.plot(running_loss, 'b-', label='Train')  # plotting t, a separately
     ax21.plot(valid_loss, 'r-', label='Valid')  # plotting t, a separately
