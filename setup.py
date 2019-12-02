@@ -13,6 +13,18 @@ setup(name="djjudge", version="0.1",
       url="https://github.com/pytorch/audio",
       packages=find_packages(),
       author="Simon J Pelletier",
-      author_email="simonjpelletier@gmail.com"
+      author_email="simonjpelletier@gmail.com",
+      install_requires=['torch',
+                        'matplotlib',
+                        'tensorflow',
+                        'numpy',
+                        'inflect',
+                        'librosa',
+                        'scipy',
+                        'tensorboardX',
+                        'Unidecode',
+                        'pillow',
+                        'magenta',
+                        'apex'
+                        ]
       )
-
