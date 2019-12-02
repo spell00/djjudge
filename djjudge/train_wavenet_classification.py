@@ -1,4 +1,3 @@
-from models.unsupervised.wavenet.wavenet import *
 from utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
 from data_preparation.audio_data2 import WavenetDataset

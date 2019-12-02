@@ -1,5 +1,4 @@
-from utils.utils import ellipse_data, create_missing_folders
-from utils.utils import ellipse_data, create_missing_folders
+from djjudge.utils.utils import ellipse_data, create_missing_folders
 import numpy as np
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt

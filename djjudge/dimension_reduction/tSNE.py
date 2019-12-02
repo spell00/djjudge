@@ -1,5 +1,4 @@
-from utils.utils import ellipse_data, create_missing_folders
-from sklearn.manifold import TSNE
+from djjudge.utils.utils import ellipse_data, create_missing_folders
 from sklearn.decomposition import PCA
 import pandas as pd
 import matplotlib.pyplot as plt

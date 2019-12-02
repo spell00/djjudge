@@ -1,5 +1,5 @@
 # http://scikit-learn.org/stable/auto_examples/classification/plot_lda_qda.html#sphx-glr-auto-examples-classification-plot-lda-qda-py
-from utils.utils import create_missing_folders
+from djjudge.utils.utils import create_missing_folders
 from scipy import linalg
 import numpy as np
 import matplotlib.pyplot as plt

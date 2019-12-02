@@ -1,9 +1,8 @@
 # https://github.com/ex4sperans/variational-inference-with-normalizing-flows/blob/master/flow.py
-import numpy as np
 import torch
 from torch.nn import functional as F
 from torch.autograd import Variable
-from utils.utils import safe_log
+from djjudge.utils.utils import safe_log
 import math
 
 import torch as t

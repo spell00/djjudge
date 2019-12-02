@@ -1,13 +1,13 @@
 import torch.optim as optim
 import torch.utils.data
 import time
-from utils.model_logging import Logger
-from utils.wavenet_modules import *
+from djjudge.utils import Logger
+from djjudge.utils.wavenet_modules import *
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
-from utils.utils import create_missing_folders
+from djjudge.utils.utils import create_missing_folders
 from matplotlib import pylab
-from utils.CycleAnnealScheduler import CycleScheduler
+from djjudge.utils.CycleAnnealScheduler import CycleScheduler
 
 
 def plot_performance(loss_total, results_path, filename):

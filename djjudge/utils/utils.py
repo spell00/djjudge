@@ -1,9 +1,7 @@
 import math
-import torch
 from torch.autograd import Variable
-import numpy as np
+
 # found at https://www.followthesheep.com/?p=1366
-import os
 
 c = - 0.5 * math.log(2 * math.pi)
 
@@ -128,7 +126,7 @@ def dict_he_uniform(matrix_init):
 
 
 def validation_split(dataset, val_share=0.1):
-    from models.split_datasets import PartialDataset
+    from djjudge.models import PartialDataset
     val_offset = int(len(dataset) * (1 - val_share))
     return PartialDataset(dataset, 0, val_offset), PartialDataset(dataset, val_offset, len(dataset) - val_offset)
 

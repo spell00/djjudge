@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from utils.utils import create_missing_folders
+from djjudge.utils.utils import create_missing_folders
 
 def plot_performance(loss_total,
                      kl_divs,

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from utils.masked_layer import MaskedConv2d, MaskedLinear
+from djjudge.utils import MaskedConv2d, MaskedLinear
 
 
 class PlanarNormalizingFlow(nn.Module):
