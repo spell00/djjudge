@@ -12,6 +12,7 @@ from models.unsupervised.wavenet.wavenet import WaveNetEncoder
 from utils.plot_performance import plot_performance
 from utils.plot_waves import plot_waves
 from utils.utils import create_missing_folders
+import torchaudio
 
 training_folders = [
     #"C:/Users/simon/Documents/MIR/genres/hiphop/wav/",

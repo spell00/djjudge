@@ -1,7 +1,7 @@
-from models.supevised.simple1DCNN import Simple1DCNN
+from models.unsupervised.wavenet.wavenet import *
 from utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from data_preparation.load_wavs_as_tensor import Wave2tensor
+from data_preparation.audio_data2 import WavenetDataset
 import torch.nn as nn
 import argparse
 import os
@@ -12,7 +12,12 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from utils.utils import create_missing_folders
 
-someModel = None
+use_cuda = torch.cuda.is_available()
+if use_cuda:
+    print('use gpu')
+    dtype = torch.cuda.FloatTensor
+    ltype = torch.cuda.LongTensor
+
 training_folders = [
     "C:/Users/simon/Documents/MIR/genres/blues/wav",
     "C:/Users/simon/Documents/MIR/genres/classical/wav",
@@ -38,6 +43,7 @@ scores = [
     "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
 ]
 output_directory = "C:/Users/simon/djjudge/"
+
 
 def plot_performance(running_loss, valid_loss, results_path, filename):
     fig2, ax21 = plt.subplots(figsize=(20, 20))
@@ -72,7 +78,19 @@ def load_checkpoint(checkpoint_path, model, optimizer):
 def save_checkpoint(model, optimizer, learning_rate, iteration, filepath):
     print("Saving model and optimizer state at iteration {} to {}".format(
         iteration, filepath))
-    model_for_saving = Simple1DCNN().cuda()
+    model_for_saving = WaveNetEncoder(
+        layers=10,
+        blocks=8,
+        dilation_channels=16,
+        residual_channels=16,
+        skip_channels=256,
+        end_channels=256,
+        output_length=1,
+        kernel_size=16,
+        dtype=dtype,
+        bias=True,
+        condition_dim=0
+    ).cuda()
     model_for_saving.load_state_dict(model.state_dict())
     torch.save({'model': model_for_saving,
                 'iteration': iteration,
@@ -87,8 +105,40 @@ def train(batch_size=8,
           checkpoint_path=None,
           epochs_per_checkpoint=1):
     torch.manual_seed(42)
-    model = Simple1DCNN().cuda()
-    model.random_init()
+    model = WaveNetEncoder(
+        layers=10,
+        blocks=8,
+        dilation_channels=16,
+        residual_channels=16,
+        skip_channels=256,
+        end_channels=256,
+        output_length=1,
+        kernel_size=16,
+        dtype=dtype,
+        bias=True,
+        condition_dim=0
+    )
+    if use_cuda:
+        print("move model to gpu")
+        model.cuda()
+    # model.random_init()
+    train_set = WavenetDataset(dataset_file='C:/Users/simon/Documents/MIR/genres/all/all_genres',
+                               scores_file_location='C:/Users/simon/Documents/MIR/genres/all/all_scores.csv',
+                               item_length=model.receptive_field + model.output_length - 1,
+                               target_length=model.output_length,
+                               file_location='C:/Users/simon/Documents/MIR/genres/all/wav',
+                               test_stride=100, train_ratio=0.8)
+    valid_set = WavenetDataset(dataset_file='C:/Users/simon/Documents/MIR/genres/all/all_genres',
+                               scores_file_location='C:/Users/simon/Documents/MIR/genres/all/all_scores.csv',
+                               item_length=model.receptive_field + model.output_length - 1,
+                               target_length=model.output_length,
+                               file_location='C:/Users/simon/Documents/MIR/genres/all/wav',
+                               test_stride=100, train_ratio=0.8, valid=True)
+    print('the dataset has ' + str(len(train_set)) + ' items')
+
+    # print('model: ', model)
+    print('receptive field: ', model.receptive_field)
+
     criterion = nn.MSELoss()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
     if fp16_run:
@@ -101,20 +151,17 @@ def train(batch_size=8,
         model, optimizer, iteration = load_checkpoint(checkpoint_path, model, optimizer)
         iteration += 1  # next iteration is iteration + 1
 
-    train_set = Wave2tensor(training_folders, scores, segment_length=300000)
+    train_loader = torch.utils.data.DataLoader(train_set,
+                                               batch_size=batch_size,
+                                               shuffle=True,
+                                               num_workers=0,
+                                               pin_memory=False)
 
-    valid_set = Wave2tensor(training_folders, scores, segment_length=300000, valid=True)
-
-    train_loader = DataLoader(train_set, num_workers=0,
-                              shuffle=True,
-                              batch_size=batch_size,
-                              pin_memory=False,
-                              drop_last=True)
-    valid_loader = DataLoader(valid_set, num_workers=0,
-                              shuffle=True,
-                              batch_size=batch_size,
-                              pin_memory=False,
-                              drop_last=True)
+    valid_loader = torch.utils.data.DataLoader(valid_set,
+                                               batch_size=batch_size,
+                                               shuffle=True,
+                                               num_workers=0,
+                                               pin_memory=False)
 
     # Get shared output_directory ready
     logger = SummaryWriter(os.path.join(output_directory, 'logs'))
@@ -124,15 +171,17 @@ def train(batch_size=8,
     train_mean_diffs = []
     valid_mean_diffs = []
     valid_losses = []
+    print("started")
     for epoch in range(epoch_offset, epochs):
         running_loss = []
         val_loss = []
         model.train()
-        for i, batch in enumerate(train_loader):
+        for i, (x, target) in enumerate(train_loader):
+            print(i, '/', len(train_loader))
+            audio = x.type(dtype).clone().detach().requires_grad_(True)
+            targets = target.view(-1).type(ltype)
             model.zero_grad()
-            audio, targets, sampling_rate = batch
-            audio = torch.autograd.Variable(audio).cuda()
-            outputs = model(audio.unsqueeze(1)).squeeze()
+            outputs = model(audio, None)
             loss = criterion(outputs, targets.cuda())
             reduced_loss = loss.item()
             running_loss += [reduced_loss]
@@ -145,7 +194,7 @@ def train(batch_size=8,
             lr_schedule.step()
             logger.add_scalar('training_loss', reduced_loss, i + len(train_loader) * epoch)
         train_losses += [np.mean(running_loss)]
-        train_mean_diffs += [float(torch.mean(torch.abs_(outputs-targets.cuda())))]
+        train_mean_diffs += [float(torch.mean(torch.abs_(outputs - targets.cuda())))]
 
         if epoch % epochs_per_checkpoint == 0:
             print("Epoch: {}:\tTrain Loss: {:.3f}, {:.3f}".format(epoch, train_losses[-1],
@@ -164,10 +213,10 @@ def train(batch_size=8,
             valid_loss += [loss.item()]
             logger.add_scalar('training loss', np.log2(reduced_loss), i + len(train_loader) * epoch)
         valid_losses += [np.mean(val_loss)]
-        valid_mean_diffs += [float(torch.mean(torch.abs_(outputs-targets.cuda())))]
+        valid_mean_diffs += [float(torch.mean(torch.abs_(outputs - targets.cuda())))]
 
         if epoch % epochs_per_checkpoint == 0:
-            checkpoint_path = "{}/cnn{}".format(output_directory, iteration)
+            checkpoint_path = "{}/cnn_lin{}".format(output_directory, iteration)
             save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path)
             print("Epoch: {}:\tValid Loss: {:.3f}, {:.3f}".format(epoch, valid_losses[-1],
                                                                   valid_mean_diffs[-1],
@@ -180,8 +229,10 @@ def train(batch_size=8,
                          results_path="figures",
                          filename="training_mean_abs_diff_trace_classification")
 
+
 def test():
     pass
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -189,4 +240,4 @@ if __name__ == "__main__":
 
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = False
-    train(batch_size=8, epochs=100000)
+    train(batch_size=16, epochs=100000)
