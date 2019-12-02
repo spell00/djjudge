@@ -1,3 +1,3 @@
 from .semi_supervised import *
-from .supevised import *
+from .supervised import *
 from .unsupervised import *
