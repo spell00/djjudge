@@ -153,7 +153,7 @@ class ConvResnet(nn.Module):
         self.bn0 = torch.nn.BatchNorm1d(dense_layers_sizes[0])
         self.is_bns = is_bns
         self.blocks = nn.Sequential(*blocks)
-        for i in range(len(dense_layers_sizes)):
+        for i in range(len(dense_layers_sizes)-1):
             self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1])
             if self.is_bns[i] == 1:
                 self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i+1])
@@ -169,25 +169,23 @@ class ConvResnet(nn.Module):
             self.final_activation = final_activation
 
     def random_init(self):
+        print("Random init")
         for m in self.modules():
             if isinstance(m, nn.Linear) or isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d):
-                nn.init.kaiming_normal_(m.weight.data)
+                nn.init.kaiming_uniform_(m.weight.data)
                 if m.bias is not None:
                     m.bias.data.zero_()
 
     def forward(self, input):
         x = self.blocks(input)
-        if self.is_dropout:
-            x = self.dropout(x)
-        if self.is_bns:
-            x = self.bn0(x)
+        x = x.view(-1, 256)
         for i, (dense, bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropout)):
             if self.is_bns:
                 x = self.bns[i](x)
-            x = dense(x.view(-1, 256))
-            x = self.activation(x)
             if self.is_dropout:
                 x = self.dropout(x)
+            x = dense(x)
+            x = self.activation(x)
 
         if self.final_activation is not None:
             x = self.final_activation(x)

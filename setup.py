@@ -7,7 +7,7 @@ from setuptools import find_packages
 
 CURRENT_PYTHON = sys.version_info[:2]
 
-setup(name="djjudge", version="0.1",
+setup(name="djjudge", version="0.2",
       description="A package for learning to classify raw audio according to a user's self-definied "
                   "scores of appreciation",
       url="https://github.com/pytorch/audio",
