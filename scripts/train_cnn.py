@@ -1,7 +1,7 @@
-from models.supevised.simple1DCNN import Simple1DCNN, ConvResnet
-from utils.CycleAnnealScheduler import CycleScheduler
+from djjudge.models.supevised.simple1DCNN import Simple1DCNN, ConvResnet
+from djjudge.utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from data_preparation.load_wavs_as_tensor import Wave2tensor
+from djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
@@ -10,7 +10,7 @@ import numpy as np
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from utils.utils import create_missing_folders
+from djjudge.utils.utils import create_missing_folders
 import math
 
 training_folders = [
