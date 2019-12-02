@@ -140,11 +140,12 @@ class ConvResnet(nn.Module):
         self.blocks = nn.Sequential(*blocks)
         self.linear1 = torch.nn.Linear(in_features=256, out_features=32)
         self.linear2 = torch.nn.Linear(in_features=32, out_features=1)
+        self.linear3 = torch.nn.Linear(in_features=1, out_features=1)
         self.bn1 = torch.nn.BatchNorm1d(256)
         self.bn2 = torch.nn.BatchNorm1d(32)
-        self.prelu = torch.nn.PReLU()
+        self.elu = torch.nn.ELU()
         self.hardtanh = nn.Hardtanh(min_val=-0.5, max_val=1.5)
-        self.dropout = nn.Dropout()
+        self.dropout = nn.Dropout(0.2)
         #self.dropout2d = nn.Dropout2d()
 
     def random_init(self):
@@ -158,16 +159,14 @@ class ConvResnet(nn.Module):
         x = self.blocks(input)
         x = self.dropout(x)
         x = self.bn1(x)
-        x = torch.tanh(x)
+        x = self.elu(x)
         x = self.dropout(x)
         x = self.linear1(x.view(-1, 256))
         x = self.bn2(x)
-        x = torch.tanh(x)
+        x = self.elu(x)
         x = self.linear2(x)
-        # x = self.hardtanh(x)
-
-        # The output will be in the interval [-0.5, 1.5], even though the range of the scores are in [0.0, 1.0].
-        # The number 1.5 is completely arbitrary.
+        x = torch.sigmoid(x)
+        x = self.linear3(x)
         return x
 
     def get_parameters(self):
