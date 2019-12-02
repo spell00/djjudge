@@ -1,4 +1,4 @@
-from djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
+from .models.supervised.CNN_1D import Simple1DCNN, ConvResnet
 from .utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
 from .data_preparation.load_wavs_as_tensor import Wave2tensor
