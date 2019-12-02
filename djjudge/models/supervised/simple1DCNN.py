@@ -60,6 +60,7 @@ class Simple1DCNN(torch.nn.Module):
             if param.requires_grad:
                 print(name, param.data.shape)
 
+
 class ResBlock(nn.Module):
     def __init__(self, in_channel, channel):
         super().__init__()

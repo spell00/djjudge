@@ -1,0 +1,1 @@
+from ..djjudge import *
