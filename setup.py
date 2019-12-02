@@ -7,5 +7,11 @@ from setuptools import setup
 CURRENT_PYTHON = sys.version_info[:2]
 
 
-setup()
+setup(name="djjudge", version="0.1",
+      description="A package for learning to classify raw audio according to a user's self-definied "
+                  "scores of appreciation",
+      url="https://github.com/pytorch/audio",
+      author="Simon J Pelletier",
+      author_email="simonjpelletier@gmail.com",
+      )
 
