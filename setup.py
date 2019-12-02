@@ -23,7 +23,6 @@ setup(name="djjudge", version="0.1",
                         'scipy',
                         'tensorboardX',
                         'Unidecode',
-                        'pillow',
                         'magenta',
                         'apex'
                         ]
