@@ -1,4 +1,4 @@
-from .models.supervised.simple1DCNN import Simple1DCNN, ConvResnet
+from djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
 from .utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
 from .data_preparation.load_wavs_as_tensor import Wave2tensor
@@ -18,7 +18,7 @@ def rand_jitter(arr):
 
 
 def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100):
-    create_missing_folders(results_path + "/plots/")
+    create_missing_folders(os.getcwd() + "/" + results_path + "/plots/")
     fig2, ax21 = plt.subplots()
 
     scores_sorted_lists = [sorted(rand_jitter(np.array(scores[i * offset:(i + 1) * offset]))) for i in range(10)]
@@ -131,11 +131,21 @@ def load_checkpoint_for_test(checkpoint_path, model):
     return model
 
 
-def save_checkpoint(model, optimizer, learning_rate, epoch, filepath):
+def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
+                    stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
-    model_for_saving = ConvResnet(in_channel=1, channel=256, n_res_block=4, n_res_channel=256, stride=4).cuda()
-    # model_for_saving = Simple1DCNN()
+    model_for_saving = ConvResnet(in_channel=1,
+                                  channel=channel,
+                                  n_res_block=n_res_block,
+                                  n_res_channel=n_res_channel,
+                                  stride=stride,
+                                  dense_layers_sizes=dense_layers_size,
+                                  is_bns=is_bns,
+                                  is_dropouts=is_dropout,
+                                  activation=activation,
+                                  final_activation=final_activation,
+                                  drop_val=dropval).cuda()
     model_for_saving.load_state_dict(model.state_dict())
     torch.save({'model': model_for_saving,
                 'epoch': epoch,
@@ -163,10 +173,10 @@ def nlll(x):
 
 
 def test(
-         training_folders,
-         scores,
-         output_directory,
-         checkpoint_path=None,):
+        training_folders,
+        scores,
+        output_directory,
+        checkpoint_path=None, ):
     torch.manual_seed(42)
     model = Simple1DCNN().cuda()
     model.random_init()
@@ -209,12 +219,12 @@ def train(training_folders,
           n_res_block=4,
           n_res_channel=256,
           stride=4,
-          activation=nn.ReLU(),
+          activation=torch.sigmoid,
           dense_layers_sizes=[32, 1],
           is_bns=[1, 1],
-          is_dropouts=[1, 1],
+          is_dropouts=[0, 0],
           final_activation=None,
-          drop_val=0.2,
+          drop_val=0.5,
           loss_type=nn.MSELoss
           ):
     torch.manual_seed(42)
@@ -232,7 +242,7 @@ def train(training_folders,
                        drop_val=drop_val
                        ).cuda()
     model.random_init()
-    criterion = loss_type
+    criterion = loss_type()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
     if fp16_run:
         from apex import amp
@@ -304,7 +314,7 @@ def train(training_folders,
             outputs = model(audio.unsqueeze(1)).squeeze()
 
             noise = torch.rand(size=[len(targets)]).normal_() * 0.01
-            targets = targets.cuda() + noise.cuda()
+            targets = targets.cuda() # + noise.cuda()
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
@@ -356,7 +366,9 @@ def train(training_folders,
 
         if epoch % epochs_per_checkpoint == 0:
             checkpoint_path = "{}/classif_ckpt/cnn".format(output_directory)
-            save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path)
+            save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path, channel, n_res_block,
+                            n_res_channel, stride, dense_layers_sizes, is_bns, is_dropouts, activation,
+                            final_activation, drop_val)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["abs_error"][-1]))

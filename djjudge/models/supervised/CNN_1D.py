@@ -99,7 +99,6 @@ class ConvResnet(nn.Module):
             blocks = [
                 nn.Conv1d(in_channel, channel // 2, 4, stride=2, padding=1),
                 nn.ReLU(inplace=True),
-                nn.Dropout2d(),
                 nn.Conv1d(channel // 2, channel, 4, stride=2, padding=1),
                 nn.ReLU(inplace=True),
                 nn.Conv1d(channel, channel, 4, stride=2, padding=1),
@@ -149,24 +148,25 @@ class ConvResnet(nn.Module):
 
         blocks.append(nn.ReLU(inplace=True))
         self.is_dropouts = is_dropouts
-        self.bns = []
+        self.dropout = [[] for _ in dense_layers_sizes]
+        self.bns = [[] for _ in dense_layers_sizes]
+        self.linears = [[] for _ in dense_layers_sizes]
         self.bn0 = torch.nn.BatchNorm1d(dense_layers_sizes[0])
         self.is_bns = is_bns
         self.blocks = nn.Sequential(*blocks)
         for i in range(len(dense_layers_sizes)-1):
-            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1])
+            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1]).cuda()
             if self.is_bns[i] == 1:
-                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i+1])
+                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i]).cuda()
             else:
                 self.bns[i] = None
             if self.is_dropouts[i] == 1:
-                self.dropout[i] = nn.Dropout(drop_val)
+                self.dropout[i] = nn.Dropout(drop_val).cuda()
             else:
                 self.dropout[i] = None
 
         self.activation = activation
-        if final_activation is not None:
-            self.final_activation = final_activation
+        self.final_activation = final_activation
 
     def random_init(self):
         print("Random init")
@@ -179,13 +179,14 @@ class ConvResnet(nn.Module):
     def forward(self, input):
         x = self.blocks(input)
         x = x.view(-1, 256)
-        for i, (dense, bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropout)):
-            if self.is_bns:
+        for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
+            if is_bn:
                 x = self.bns[i](x)
-            if self.is_dropout:
-                x = self.dropout(x)
+            if is_drop:
+                x = self.dropout[i](x)
             x = dense(x)
-            x = self.activation(x)
+            if i < len(self.bns)-2:
+                x = self.activation(x)
 
         if self.final_activation is not None:
             x = self.final_activation(x)
