@@ -172,7 +172,7 @@ class ConvResnet(nn.Module):
         print("Random init")
         for m in self.modules():
             if isinstance(m, nn.Linear) or isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d):
-                nn.init.kaiming_uniform_(m.weight.data)
+                nn.init.kaiming_normal_(m.weight.data)
                 if m.bias is not None:
                     m.bias.data.zero_()
 
