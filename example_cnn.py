@@ -40,6 +40,6 @@ if __name__ == "__main__":
           batch_size=8,
           epochs=100000,
           epochs_per_checkpoint=1,
-          learning_rate=1e-4,
+          learning_rate=1e-3,
           fp16_run=False,
           checkpoint_path=None)

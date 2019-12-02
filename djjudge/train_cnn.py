@@ -18,7 +18,7 @@ def rand_jitter(arr):
 
 
 def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100):
-    create_missing_folders(os.getcwd() + "/" + results_path + "/plots/")
+    create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
 
     scores_sorted_lists = [sorted(rand_jitter(np.array(scores[i * offset:(i + 1) * offset]))) for i in range(10)]
@@ -179,7 +179,6 @@ def test(
         checkpoint_path=None, ):
     torch.manual_seed(42)
     model = Simple1DCNN().cuda()
-    model.random_init()
     criterion = nn.MSELoss()
     # Load checkpoint if one exists
     epoch = 0
@@ -225,7 +224,8 @@ def train(training_folders,
           is_dropouts=[0, 0],
           final_activation=None,
           drop_val=0.5,
-          loss_type=nn.MSELoss
+          loss_type=nn.MSELoss,
+          init_method=nn.init.xavier_normal_
           ):
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
@@ -241,7 +241,7 @@ def train(training_folders,
                        final_activation=final_activation,
                        drop_val=drop_val
                        ).cuda()
-    model.random_init()
+    model.random_init(init_method=init_method)
     criterion = loss_type()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
     if fp16_run:
