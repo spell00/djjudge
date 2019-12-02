@@ -1,11 +1,11 @@
 import torch
-from utils.stochastic import GaussianSample
+from ..utils.stochastic import GaussianSample
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.distributions import log_gaussian, log_standard_gaussian
-from old_files.flow import NormalizingFlows
-from utils.masked_layer import GatedConv1d, GatedConvTranspose1d
+from ..utils.distributions import log_gaussian, log_standard_gaussian
+from ..utils.flow import NormalizingFlows
+from ..utils.masked_layer import GatedConv1d, GatedConvTranspose1d
 
 in_channels = None
 out_channels = None

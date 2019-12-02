@@ -1,10 +1,12 @@
-from djjudge.utils import GaussianSample
+from ..utils.stochastic import GaussianSample
 from torch.autograd import Variable
 import torch.nn.functional as F
-from djjudge.utils import log_gaussian, log_standard_gaussian
-from old_files.flow import NormalizingFlows
-from djjudge.utils import GatedConv1d, GatedConvTranspose1d
-
+from .VectorQuantizer import VectorQuantizer
+from ..utils.distributions import log_gaussian, log_standard_gaussian
+from ..utils.flow import NormalizingFlows
+from ..utils.masked_layer import GatedConv1d, GatedConvTranspose1d
+import torch
+from torch import nn
 in_channels = None
 out_channels = None
 kernel_sizes = None

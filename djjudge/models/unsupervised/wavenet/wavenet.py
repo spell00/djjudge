@@ -1,19 +1,20 @@
 import os.path
 import time
-from data_preparation.audio_data import *
+from ....data_preparation.audio_data import *
 from torch import nn
 from torch.nn import functional as F
 
+
 class WNConv1d(nn.Module):
     def __init__(
-        self,
-        in_channel,
-        out_channel,
-        kernel_size,
-        stride=1,
-        padding=0,
-        bias=True,
-        activation=None,
+            self,
+            in_channel,
+            out_channel,
+            kernel_size,
+            stride=1,
+            padding=0,
+            bias=True,
+            activation=None,
     ):
         super().__init__()
 
@@ -44,7 +45,6 @@ class WNConv1d(nn.Module):
             out = self.activation(out)
 
         return out
-
 
 
 class WaveNetEncoder(nn.Module):
@@ -198,8 +198,8 @@ class WaveNetEncoder(nn.Module):
             gate = torch.sigmoid(pre_gate)
             x = filter * gate
 
-            #if cond is not None:
-                #cond = self.condition(cond)
+            # if cond is not None:
+            # cond = self.condition(cond)
             #    residual_cond = dilation_func(cond, dilation, init_dilation, i)
             #    filter_cond = self.filter_convs[i](residual_cond)
             #    filter_cond = torch.tanh(filter_cond)
@@ -359,7 +359,8 @@ class WaveNetEncoder(nn.Module):
             if (i + 1) == 100:
                 toc = time.time()
                 print("one generating step does take approximately " + str((toc - tic) * 0.01) + " seconds)")
-                print("Approximate Generating time: " + str(np.round(((toc - tic) * 0.01 * num_samples) / 60, 2)) + " minutes)")
+                print("Approximate Generating time: " + str(
+                    np.round(((toc - tic) * 0.01 * num_samples) / 60, 2)) + " minutes)")
 
             # progress feedback
             if (i + num_given_samples) % progress_interval == 0:

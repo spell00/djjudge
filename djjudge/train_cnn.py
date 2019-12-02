@@ -204,12 +204,35 @@ def train(training_folders,
           learning_rate=1e-3,
           fp16_run=False,
           checkpoint_path=None,
-          epochs_per_checkpoint=50):
+          epochs_per_checkpoint=50,
+          channel=256,
+          n_res_block=4,
+          n_res_channel=256,
+          stride=4,
+          activation=nn.ELU(),
+          dense_layers_sizes=[32],
+          is_bns=[1, 1],
+          is_dropouts=[1, 1],
+          final_activation=None,
+          drop_val=0.2,
+          loss_type=nn.MSELoss
+          ):
     torch.manual_seed(42)
-    model = ConvResnet(in_channel=1, channel=256, n_res_block=4, n_res_channel=256, stride=4).cuda()
-    # model = Simple1DCNN()
+    dense_layers_sizes = [channel] + dense_layers_sizes
+    model = ConvResnet(in_channel=1,
+                       channel=channel,
+                       n_res_block=n_res_block,
+                       n_res_channel=n_res_channel,
+                       stride=stride,
+                       dense_layers_sizes=dense_layers_sizes,
+                       is_bns=is_bns,
+                       is_dropouts=is_dropouts,
+                       activation=activation,
+                       final_activation=final_activation,
+                       drop_val=drop_val
+                       ).cuda()
     model.random_init()
-    criterion = nn.MSELoss()
+    criterion = loss_type
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
     if fp16_run:
         from apex import amp

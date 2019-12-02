@@ -80,7 +80,19 @@ class ResBlock(nn.Module):
 
 
 class ConvResnet(nn.Module):
-    def __init__(self, in_channel, channel, n_res_block, n_res_channel, stride):
+    def __init__(self,
+                 in_channel,
+                 channel,
+                 n_res_block,
+                 n_res_channel,
+                 stride,
+                 activation,
+                 dense_layers_sizes,
+                 is_bns,
+                 is_dropouts,
+                 final_activation=None,
+                 drop_val=0.2
+                 ):
         super().__init__()
 
         if stride == 4:
@@ -136,37 +148,50 @@ class ConvResnet(nn.Module):
             blocks.append(ResBlock(channel, n_res_channel))
 
         blocks.append(nn.ReLU(inplace=True))
-
+        self.is_dropouts = is_dropouts
+        self.bns = []
+        self.bn0 = torch.nn.BatchNorm1d(dense_layers_sizes[0])
+        self.is_bns = is_bns
         self.blocks = nn.Sequential(*blocks)
-        self.linear1 = torch.nn.Linear(in_features=256, out_features=32)
-        self.linear2 = torch.nn.Linear(in_features=32, out_features=1)
-        self.linear3 = torch.nn.Linear(in_features=1, out_features=1)
-        self.bn1 = torch.nn.BatchNorm1d(256)
-        self.bn2 = torch.nn.BatchNorm1d(32)
-        self.elu = torch.nn.ELU()
-        self.hardtanh = nn.Hardtanh(min_val=-0.5, max_val=1.5)
-        self.dropout = nn.Dropout(0.2)
-        #self.dropout2d = nn.Dropout2d()
+        for i in range(len(dense_layers_sizes)):
+            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1])
+            if self.is_bns[i] == 1:
+                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i+1])
+            else:
+                self.bns[i] = None
+            if self.is_dropouts[i] == 1:
+                self.dropout[i] = nn.Dropout(drop_val)
+            else:
+                self.dropout[i] = None
+
+        self.activation = activation
+        if final_activation is not None:
+            self.final_activation = final_activation
 
     def random_init(self):
         for m in self.modules():
             if isinstance(m, nn.Linear) or isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d):
-                nn.init.xavier_normal_(m.weight.data)
+                nn.init.kaiming_normal_(m.weight.data)
                 if m.bias is not None:
                     m.bias.data.zero_()
 
     def forward(self, input):
         x = self.blocks(input)
-        x = self.dropout(x)
-        x = self.bn1(x)
-        x = self.elu(x)
-        x = self.dropout(x)
-        x = self.linear1(x.view(-1, 256))
-        x = self.bn2(x)
-        x = self.elu(x)
-        x = self.linear2(x)
-        x = torch.sigmoid(x)
-        x = self.linear3(x)
+        if self.is_dropout:
+            x = self.dropout(x)
+        if self.is_bns:
+            x = self.bn0(x)
+        for i, (dense, bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropout)):
+            if self.is_bns:
+                x = self.bns[i](x)
+            x = dense(x.view(-1, 256))
+            x = self.activation(x)
+            if self.is_dropout:
+                x = self.dropout(x)
+
+        if self.final_activation is not None:
+            x = self.final_activation(x)
+        # x = self.linear3(x)
         return x
 
     def get_parameters(self):

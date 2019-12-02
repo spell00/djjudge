@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from utils.distributions import log_gaussian, log_standard_gaussian
+from ..utils.distributions import log_gaussian, log_standard_gaussian
 
 
 # Copyright 2018 The Sonnet Authors. All Rights Reserved.
