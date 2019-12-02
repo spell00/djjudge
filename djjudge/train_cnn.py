@@ -1,7 +1,7 @@
-from djjudge.models.supevised.simple1DCNN import Simple1DCNN, ConvResnet
-from djjudge.utils.CycleAnnealScheduler import CycleScheduler
+from .models.supevised.simple1DCNN import Simple1DCNN, ConvResnet
+from .utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
+from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
@@ -10,34 +10,8 @@ import numpy as np
 from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from djjudge.utils.utils import create_missing_folders
+from .utils.utils import create_missing_folders
 import math
-
-training_folders = [
-    "C:/Users/simon/Documents/MIR/genres/blues/wav",
-    "C:/Users/simon/Documents/MIR/genres/classical/wav",
-    "C:/Users/simon/Documents/MIR/genres/country/wav",
-    "C:/Users/simon/Documents/MIR/genres/disco/wav",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
-    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
-    "C:/Users/simon/Documents/MIR/genres/metal/wav",
-    "C:/Users/simon/Documents/MIR/genres/pop/wav",
-    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
-    "C:/Users/simon/Documents/MIR/genres/rock/wav",
-]
-scores = [
-    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
-]
-output_directory = "C:/Users/simon/djjudge/"
 
 
 def rand_jitter(arr):
@@ -184,7 +158,11 @@ def nlll(x):
     return torch.stack(ent)
 
 
-def test(checkpoint_path=None):
+def test(
+         training_folders,
+         scores,
+         output_directory,
+         checkpoint_path=None,):
     torch.manual_seed(42)
     model = Simple1DCNN().cuda()
     model.random_init()
@@ -214,7 +192,10 @@ def test(checkpoint_path=None):
     del valid_abs
 
 
-def train(batch_size=8,
+def train(training_folders,
+          scores,
+          output_directory,
+          batch_size=8,
           epochs=100,
           learning_rate=1e-3,
           fp16_run=False,
@@ -362,7 +343,35 @@ def train(batch_size=8,
         del loss_list
 
 
+"""
+training_folders = [
+    "C:/Users/simon/Documents/MIR/genres/blues/wav",
+    "C:/Users/simon/Documents/MIR/genres/classical/wav",
+    "C:/Users/simon/Documents/MIR/genres/country/wav",
+    "C:/Users/simon/Documents/MIR/genres/disco/wav",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
+    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
+    "C:/Users/simon/Documents/MIR/genres/metal/wav",
+    "C:/Users/simon/Documents/MIR/genres/pop/wav",
+    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
+    "C:/Users/simon/Documents/MIR/genres/rock/wav",
+]
+scores = [
+    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+]
+output_directory = "C:/Users/simon/djjudge/"
+
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
     num_gpus = torch.cuda.device_count()
 
@@ -374,3 +383,5 @@ if __name__ == "__main__":
           learning_rate=1e-3,
           fp16_run=True,
           checkpoint_path="classif_ckpt/cnn")
+
+"""
