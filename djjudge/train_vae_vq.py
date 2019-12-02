@@ -1,13 +1,13 @@
-from djjudge.utils.CycleAnnealScheduler import CycleScheduler
+from .utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
+from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
 import torch
 import numpy as np
 from tensorboardX import SummaryWriter
-from djjudge.models.unsupervised.VAE_VQ import VariationalAutoencoderVQ
+from .models.unsupervised.VAE_VQ import VariationalAutoencoderVQ
 
 from djjudge.utils.plot_performance import plot_performance
 from djjudge.utils.plot_waves import plot_waves

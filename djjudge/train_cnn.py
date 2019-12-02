@@ -3,11 +3,9 @@ from .utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
 from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
-import argparse
 import os
 import torch
 import numpy as np
-from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from .utils.utils import create_missing_folders
