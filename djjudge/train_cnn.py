@@ -109,7 +109,7 @@ def plot_performance(running_loss, valid_loss, results_path, filename):
     plt.close()
 
 
-def load_checkpoint(checkpoint_path, model, optimizer):
+def load_checkpoint(checkpoint_path, model, optimizer, fp16_run=False):
     print("importing checkpoint from", checkpoint_path)
     assert os.path.isfile(checkpoint_path)
 
@@ -119,6 +119,10 @@ def load_checkpoint(checkpoint_path, model, optimizer):
     model_for_loading = checkpoint_dict['model']
     model.load_state_dict(model_for_loading.state_dict())
     print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
+    if fp16_run:
+        from apex import amp
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
+
     return model, optimizer, epoch
 
 
@@ -157,7 +161,7 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
 def mse_corr(x, targets):
     arr = []
     for score, t in zip(x, targets):
-        arr += [torch.abs_(score * (0.4 - t))]
+        arr += [score * t]
     return torch.stack(arr).cuda()
 
 
@@ -218,14 +222,16 @@ def train(training_folders,
           n_res_block=4,
           n_res_channel=256,
           stride=4,
-          activation=torch.sigmoid,
+          activation=torch.relu,
           dense_layers_sizes=[32, 1],
           is_bns=[1, 1],
-          is_dropouts=[0, 0],
+          is_dropouts=[1, 1],
           final_activation=None,
           drop_val=0.5,
           loss_type=nn.MSELoss,
-          init_method=nn.init.xavier_normal_
+          init_method=nn.init.kaiming_normal_,
+          noise=0.02,
+          average_score=0.4,
           ):
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
@@ -239,7 +245,7 @@ def train(training_folders,
                        is_dropouts=is_dropouts,
                        activation=activation,
                        final_activation=final_activation,
-                       drop_val=drop_val
+                       drop_val=drop_val,
                        ).cuda()
     model.random_init(init_method=init_method)
     criterion = loss_type()
@@ -252,7 +258,7 @@ def train(training_folders,
     epoch = 0
     if checkpoint_path is not None:
         print("Getting checkpoint at", checkpoint_path)
-        model, optimizer, epoch = load_checkpoint(checkpoint_path, model, optimizer)
+        model, optimizer, epoch = load_checkpoint(checkpoint_path, model, optimizer, fp16_run)
         epoch += 1  # next epoch is epoch + 1
 
     all_set = Wave2tensor(training_folders, scores, segment_length=300000, all=True, valid=False)
@@ -288,7 +294,6 @@ def train(training_folders,
             "mse": [],
         }
     }
-    model.cuda()
     for epoch in range(epoch_offset, epochs):
         loss_list = {
             "train": {
@@ -312,15 +317,60 @@ def train(training_folders,
             audio, targets, sampling_rate = batch
             audio = torch.autograd.Variable(audio).cuda()
             outputs = model(audio.unsqueeze(1)).squeeze()
+            outputs_original = outputs.clone().detach()
+            noisy = torch.rand(len(targets)).normal_() * noise
+            targets += noisy
 
-            noise = torch.rand(size=[len(targets)]).normal_() * 0.01
-            targets = targets.cuda() # + noise.cuda()
+            targets = targets.cuda()
+
+
+
+            """
+            If predicted values are <= targets and the targets are also <= 0, then no correction
+            If predicted values are >= targets and the targets are also >= 1, then no correction
+
+            There are surely better songs than those we used, which reach the max of 1.0, so the prediction 
+            can predict better scores. If the scores if 1.3 but the real label is 1.0, we do not really want to 
+            correct this because it will make the classifier more conservative, which is not wanted
+
+            """
+            lt_zero = torch.where((targets <= 0.) & (outputs <= targets))[0]
+            gt_one = torch.where((targets >= 1.) & (outputs >= targets))[0]
+            if len(lt_zero) > 0:
+                # print("Corrected some smaller than 0 values")
+                outputs[lt_zero] = targets[lt_zero].clone().detach()
+            if len(gt_one) > 0:
+                # print("Corrected some larger than 1 values")
+                outputs[gt_one] = targets[gt_one].clone().detach()
+
+            """
+            If predicted values are >= targets and the targets are also >= 0.4 (the average score):
+                the squared difference |target-0.4|*(target - output)**2 is added to the actual score to give a corrected scores
+
+            If predicted values are <= targets and the targets are also <= 0.4 (the average score):
+                the squared difference |target-0.4|*(target - output)**2 is substracted to the actual score to give a corrected scores
+
+            This correction must be greater at the extremes than at the average scores, where it should not change 
+                the score at all, this is why it is weighted by |target-0.4|*
+
+
+            """
+
+            lt_avg = torch.where((targets <= average_score) & (outputs <= targets))[0]
+            gt_avg = torch.where((targets >= average_score) & (outputs >= targets))[0]
+
+            if len(lt_avg) > 0:
+                # O* = O + [ [ O + ( T - ( O - T ) ^ 2 ) ] * | avg - T | ]
+                outputs[lt_avg] = outputs[lt_avg].clone().detach() + ((outputs[lt_avg].clone().detach() + (targets[lt_avg].clone().detach() - (outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach())) ** 2) * torch.abs(targets[lt_avg].clone().detach() - average_score) / average_score)
+            if len(gt_avg) > 0:
+                # O* = O - [ [ O - ( T + ( O - T ) ^ 2 ) ] * | avg - T | ]
+                outputs[gt_avg] = outputs[gt_avg].clone().detach() - ((outputs[gt_avg].clone().detach() - (targets[gt_avg].clone().detach() + (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach())) ** 2) * torch.abs(targets[gt_avg].clone().detach() - average_score) / average_score)
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
             # logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
-            train_abs = torch.mean(torch.abs_(outputs - targets.cuda()))
-            loss_list["train"]["outputs_list"].extend(outputs.detach().cpu().numpy())
+            # train_abs = torch.mean(torch.abs_(outputs - targets.cuda()))
+            loss_list["train"]["outputs_list"].extend(outputs_original.detach().cpu().numpy())
             loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["train"]["mse"] += [mse_loss.item()]
             loss_list["train"]["abs_error"] += [mse_loss.item()]
@@ -332,7 +382,7 @@ def train(training_folders,
 
             optimizer.step()
             lr_schedule.step()
-            del loss, outputs, targets, train_abs, audio, mse_loss  # , energy_loss
+            del loss, outputs, targets, audio, mse_loss, noisy, outputs_original  # , energy_loss
         losses["train"]["mse"] += [float(np.mean(loss_list["train"]["mse"]))]
         losses["train"]["abs_error"] += [float(np.mean(loss_list["train"]["abs_error"]))]
         performance_per_score(loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"],

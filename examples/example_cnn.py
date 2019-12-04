@@ -1,5 +1,5 @@
 import torch
-from .djjudge.models.supervised.simple1DCNN import *
+from djjudge.models.supervised.simple1DCNN import *
 from djjudge.train_cnn import train
 
 if __name__ == "__main__":
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     train(training_folders,
           scores,
           output_directory,
-          batch_size=8,
+          batch_size=32,
           epochs=100000,
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
-          fp16_run=False,
+          fp16_run=True,
           checkpoint_path=None)

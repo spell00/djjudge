@@ -91,7 +91,7 @@ class ConvResnet(nn.Module):
                  is_bns,
                  is_dropouts,
                  final_activation=None,
-                 drop_val=0.2
+                 drop_val=0.5,
                  ):
         super().__init__()
 
@@ -184,9 +184,10 @@ class ConvResnet(nn.Module):
                 x = self.bns[i](x)
             if is_drop:
                 x = self.dropout[i](x)
-            x = dense(x)
+            # TODO linear layers are not turning to float16
+            x = dense(x.float())
             if i < len(self.bns)-2:
-                x = self.activation(x)
+                x = self.activation(x.float())
 
         if self.final_activation is not None:
             x = self.final_activation(x)

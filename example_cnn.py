@@ -1,34 +1,34 @@
 import torch
-from djjudge.models.supervised.simple1DCNN import *
+# from djjudge.models.supervised.CNN_1D import *
 from djjudge.train_cnn import train
 
 if __name__ == "__main__":
 
     training_folders = [
-        "C:/Users/simon/Documents/MIR/genres/blues/wav",
-        "C:/Users/simon/Documents/MIR/genres/classical/wav",
-        "C:/Users/simon/Documents/MIR/genres/country/wav",
-        "C:/Users/simon/Documents/MIR/genres/disco/wav",
-        "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
-        "C:/Users/simon/Documents/MIR/genres/jazz/wav",
-        "C:/Users/simon/Documents/MIR/genres/metal/wav",
-        "C:/Users/simon/Documents/MIR/genres/pop/wav",
-        "C:/Users/simon/Documents/MIR/genres/reggae/wav",
-        "C:/Users/simon/Documents/MIR/genres/rock/wav",
+        "/home/simon/Desktop/MIR/genres/blues/wav",
+        "/home/simon/Desktop/MIR/genres/classical/wav",
+        "/home/simon/Desktop/MIR/genres/country/wav",
+        "/home/simon/Desktop/MIR/genres/disco/wav",
+        "/home/simon/Desktop/MIR/genres/hiphop/wav",
+        "/home/simon/Desktop/MIR/genres/jazz/wav",
+        "/home/simon/Desktop/MIR/genres/metal/wav",
+        "/home/simon/Desktop/MIR/genres/pop/wav",
+        "/home/simon/Desktop/MIR/genres/reggae/wav",
+        "/home/simon/Desktop/MIR/genres/rock/wav",
     ]
     scores = [
-        "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+        "/home/simon/Desktop/MIR/genres/blues/scores.csv",
+        "/home/simon/Desktop/MIR/genres/classical/scores.csv",
+        "/home/simon/Desktop/MIR/genres/country/scores.csv",
+        "/home/simon/Desktop/MIR/genres/disco/scores.csv",
+        "/home/simon/Desktop/MIR/genres/hiphop/scores.csv",
+        "/home/simon/Desktop/MIR/genres/jazz/scores.csv",
+        "/home/simon/Desktop/MIR/genres/metal/scores.csv",
+        "/home/simon/Desktop/MIR/genres/pop/scores.csv",
+        "/home/simon/Desktop/MIR/genres/reggae/scores.csv",
+        "/home/simon/Desktop/MIR/genres/rock/scores.csv",
     ]
-    output_directory = "C:/Users/simon/djjudge/"
+    output_directory = "."
 
     num_gpus = torch.cuda.device_count()
 
@@ -42,4 +42,12 @@ if __name__ == "__main__":
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
           fp16_run=False,
-          checkpoint_path=None)
+          checkpoint_path="classif_ckpt/cnn",
+          is_bns=[0, 0],
+          is_dropouts=[1, 1],
+          activation=torch.nn.PReLU(),
+          final_activation=None,
+          noise=0.02,
+          loss_type=torch.nn.MSELoss,
+          init_method=torch.nn.init.kaiming_normal_,
+          )
