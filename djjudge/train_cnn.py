@@ -397,11 +397,11 @@ def train(training_folders,
             gt_avg = torch.where((targets > average_score) & (outputs > targets))[0]
             if factor > 1.0:
                 if len(lt_avg) > 0:
-                    # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * | avg - T | ) ]
-                    outputs[lt_avg] = outputs[lt_avg].clone().detach() + ( (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ( (  torch.abs(outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()) ** factor) * (1-torch.abs(targets[lt_avg].clone().detach() - average_score)) ) ) # / average_score
+                    # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
+                    outputs[lt_avg] = outputs[lt_avg].clone().detach() + ( (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ( (  torch.abs(outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (1 - torch.abs(targets[lt_avg].clone().detach() - average_score)) ) ) # / average_score
                 if len(gt_avg) > 0:
-                    # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * | avg - T | ) ]
-                    outputs[gt_avg] = outputs[gt_avg].clone().detach() - ( (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ( (  torch.abs(outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) ** factor) * (1 - torch.abs(targets[gt_avg].clone().detach() - average_score)) )) # / average_score
+                    # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
+                    outputs[gt_avg] = outputs[gt_avg].clone().detach() - ( (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ( (  torch.abs(outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (1 - torch.abs(targets[gt_avg].clone().detach() - average_score)) )) # / average_score
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
