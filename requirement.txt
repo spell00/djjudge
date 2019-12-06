@@ -1,0 +1,8 @@
+MIDIUtil==1.2.1
+mido==1.2.9
+music21==5.7.1
+numpy==1.17.4
+PyQt5==5.13.1
+PyQt5-sip==12.7.0
+PyQt5-stubs==5.13.1.2
+python-vlc==3.0.7110
