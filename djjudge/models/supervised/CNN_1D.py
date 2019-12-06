@@ -3,8 +3,19 @@ from torch import nn
 
 
 class Simple1DCNN(torch.nn.Module):
-    def __init__(self):
+    def __init__(self,
+                 activation,
+                 is_bns,
+                 is_dropouts,
+                 final_activation=None,
+                 drop_val=0.5,
+                 ):
         super(Simple1DCNN, self).__init__()
+        self.activation = activation.cuda()
+        self.activation = activation.cuda()
+        self.is_bns = is_bns
+        self.is_dropouts = is_dropouts
+        self.final_activation = final_activation
         self.layers = []
         self.bns = []
         self.lns = []
@@ -17,36 +28,37 @@ class Simple1DCNN(torch.nn.Module):
         self.relu = torch.nn.ReLU()
         i = 0
         for ins, outs, ksize, stride in zip(in_channels, out_channels, kernel_sizes, strides):
-            self.layers += [torch.nn.Conv1d(in_channels=ins, out_channels=outs, kernel_size=ksize, stride=stride)]
+            self.layers += [torch.nn.Conv1d(in_channels=ins, out_channels=outs, kernel_size=ksize, stride=stride).cuda()]
             if self.pooling[i] == 1:
-                self.pooling_layers += [torch.nn.AdaptiveAvgPool1d(output_size=2)]
+                self.pooling_layers += [torch.nn.AdaptiveAvgPool1d(output_size=2).cuda()]
             else:
                 self.pooling_layers += [None]
             self.bns += [nn.BatchNorm1d(num_features=outs).cuda()]
             # self.lns += [nn.LayerNorm(normalized_shape=None).cuda()]
             i += 1
-        self.dense1 = torch.nn.Linear(in_features=1233, out_features=1)
-        self.dropout = nn.Dropout(0.2)
+        self.dense1 = torch.nn.Linear(in_features=1233, out_features=1).cuda()
+        self.dropout = nn.Dropout(drop_val)
         self.layers = nn.ModuleList(self.layers)
 
-    def random_init(self):
+    def random_init(self, init_method):
         for i in range(len(self.layers)):
-            nn.init.kaiming_uniform_(self.layers[i].weight)
+            init_method(self.layers[i].weight)
             nn.init.constant_(self.layers[i].bias, 0)
-        nn.init.kaiming_uniform_(self.dense1.weight)
+        init_method(self.dense1.weight)
         nn.init.constant_(self.dense1.bias, 0)
 
     def forward(self, x):
         for i in range(len(self.layers)):
+            #if i == len(self.layers) - 1:
+            #    x = self.bns[i-1](x)
+            x = self.dropout(x)
             x = self.layers[i](x)
-            x = self.relu(x)
+            x = self.activation(x)
             if self.pooling[i] == 1:
                 x = self.pooling_layers[i](x)
-            if i == len(self.layers) - 1:
-                x = self.bns[i](x)
         x = x.squeeze()
         x = self.dense1(x)
-        x = torch.sigmoid(x)
+        x = self.final_activation(x)
 
         return x
 

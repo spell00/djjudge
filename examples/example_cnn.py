@@ -42,4 +42,4 @@ if __name__ == "__main__":
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
           fp16_run=True,
-          checkpoint_path=None)
+          checkpoint_name=None)

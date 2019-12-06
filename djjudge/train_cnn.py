@@ -37,7 +37,7 @@ def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100
     del scores, scores_sorted_lists
 
 
-def performance_per_score(predicted_values, target_values, results_path, n, filename="scores_performance", valid=False):
+def performance_per_score(predicted_values, target_values, results_path, n, filename="scores_performance",valid=False, noise=False):
     create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
     predicted_values = np.array(predicted_values)
@@ -48,8 +48,10 @@ def performance_per_score(predicted_values, target_values, results_path, n, file
     target_values = np.array(target_values)
     # ax21.set_ylim([0, 1])
     # ax21.set_xlim([0, 1])
-    if not valid:
-        plt.scatter(target_values, rand_jitter(predicted_values), facecolors='none', edgecolors="r")
+    if not valid and not noise:
+        plt.scatter(rand_jitter(target_values), predicted_values, facecolors='none', edgecolors="r")
+    elif not valid and noise:
+        plt.scatter(target_values, predicted_values, facecolors='none', edgecolors="r")
     else:
         for i, (c, genre) in enumerate(zip(colors, genres)):
             plt.scatter(target_values[i * n:(i + 1) * n], rand_jitter(predicted_values[i * n:(i + 1) * n]),
@@ -111,7 +113,6 @@ def plot_performance(running_loss, valid_loss, results_path, filename):
 
 def load_checkpoint(checkpoint_path, model, optimizer, fp16_run=False):
     print("importing checkpoint from", checkpoint_path)
-    assert os.path.isfile(checkpoint_path)
 
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     epoch = checkpoint_dict['epoch']
@@ -136,10 +137,11 @@ def load_checkpoint_for_test(checkpoint_path, model):
 
 
 def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
-                    stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval):
+                    stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
-    model_for_saving = ConvResnet(in_channel=1,
+    if model_type == "convresnet":
+        model_for_saving = ConvResnet(in_channel=1,
                                   channel=channel,
                                   n_res_block=n_res_block,
                                   n_res_channel=n_res_channel,
@@ -150,6 +152,15 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
                                   activation=activation,
                                   final_activation=final_activation,
                                   drop_val=dropval).cuda()
+    else:
+        model_for_saving = Simple1DCNN(
+            activation=activation,
+            final_activation=final_activation,
+            drop_val=dropval,
+            is_bns=is_bns,
+            is_dropouts=is_dropout
+        )
+
     model_for_saving.load_state_dict(model.state_dict())
     torch.save({'model': model_for_saving,
                 'epoch': epoch,
@@ -216,7 +227,7 @@ def train(training_folders,
           epochs=100,
           learning_rate=1e-3,
           fp16_run=False,
-          checkpoint_path=None,
+          checkpoint_name=None,
           epochs_per_checkpoint=50,
           channel=256,
           n_res_block=4,
@@ -230,23 +241,44 @@ def train(training_folders,
           drop_val=0.5,
           loss_type=nn.MSELoss,
           init_method=nn.init.kaiming_normal_,
-          noise=0.02,
+          noise=0.,
           average_score=0.4,
+          factor=2,
+          flat_extrems=False,
+          model_type="convresnet"
           ):
+    if noise > 0.:
+        is_noisy = True
+    else:
+        is_noisy = False
+    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type, str(init_method).split(" ")[1],
+                                                          str(activation).split('torch.')[0],
+                                                          str(final_activation).split('torch.')[0],
+                                                          str(is_bns), str(is_dropouts))
+
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
-    model = ConvResnet(in_channel=1,
-                       channel=channel,
-                       n_res_block=n_res_block,
-                       n_res_channel=n_res_channel,
-                       stride=stride,
-                       dense_layers_sizes=dense_layers_sizes,
-                       is_bns=is_bns,
-                       is_dropouts=is_dropouts,
-                       activation=activation,
-                       final_activation=final_activation,
-                       drop_val=drop_val,
-                       ).cuda()
+    if model_type == "convresnet":
+        model = ConvResnet(in_channel=1,
+                           channel=channel,
+                           n_res_block=n_res_block,
+                           n_res_channel=n_res_channel,
+                           stride=stride,
+                           dense_layers_sizes=dense_layers_sizes,
+                           is_bns=is_bns,
+                           is_dropouts=is_dropouts,
+                           activation=activation,
+                           final_activation=final_activation,
+                           drop_val=drop_val
+                           ).cuda()
+    else:
+        model = Simple1DCNN(
+            activation=activation,
+            final_activation=final_activation,
+            drop_val=drop_val,
+            is_bns=is_bns,
+            is_dropouts=is_dropouts
+        )
     model.random_init(init_method=init_method)
     criterion = loss_type()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
@@ -256,9 +288,12 @@ def train(training_folders,
 
     # Load checkpoint if one exists
     epoch = 0
-    if checkpoint_path is not None:
-        print("Getting checkpoint at", checkpoint_path)
-        model, optimizer, epoch = load_checkpoint(checkpoint_path, model, optimizer, fp16_run)
+    if checkpoint_name is not None:
+        print("Getting checkpoint at", checkpoint_complete_name)
+        try:
+            model, optimizer, epoch = load_checkpoint(checkpoint_complete_name, model, optimizer, fp16_run)
+        except:
+            print("No model found by the given name. Making a new model...")
         epoch += 1  # next epoch is epoch + 1
 
     all_set = Wave2tensor(training_folders, scores, segment_length=300000, all=True, valid=False)
@@ -283,7 +318,7 @@ def train(training_folders,
     # Get shared output_directory ready
     # logger = SummaryWriter(os.path.join(output_directory, 'logs'))
     epoch_offset = max(1, epoch)
-    lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=epochs * len(train_loader))
+    lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=(epochs-epoch_offset) * len(train_loader))
     losses = {
         "train": {
             "abs_error": [],
@@ -301,6 +336,7 @@ def train(training_folders,
                 "mse": [],
                 "targets_list": [],
                 "outputs_list": [],
+                "outputs_list2": [],
             },
             "valid": {
                 "valid_abs_all": [],
@@ -336,12 +372,13 @@ def train(training_folders,
             """
             lt_zero = torch.where((targets <= 0.) & (outputs <= targets))[0]
             gt_one = torch.where((targets >= 1.) & (outputs >= targets))[0]
-            if len(lt_zero) > 0:
-                # print("Corrected some smaller than 0 values")
-                outputs[lt_zero] = targets[lt_zero].clone().detach()
-            if len(gt_one) > 0:
-                # print("Corrected some larger than 1 values")
-                outputs[gt_one] = targets[gt_one].clone().detach()
+            if flat_extrems:
+                if len(lt_zero) > 0:
+                    print("Corrected some smaller than 0 values")
+                    outputs[lt_zero] = targets[lt_zero].clone().detach()
+                if len(gt_one) > 0:
+                    print("Corrected some larger than 1 values")
+                    outputs[gt_one] = targets[gt_one].clone().detach()
 
             """
             If predicted values are >= targets and the targets are also >= 0.4 (the average score):
@@ -356,21 +393,22 @@ def train(training_folders,
 
             """
 
-            lt_avg = torch.where((targets <= average_score) & (outputs <= targets))[0]
-            gt_avg = torch.where((targets >= average_score) & (outputs >= targets))[0]
-
-            if len(lt_avg) > 0:
-                # O* = O + [ [ O + ( T - ( O - T ) ^ 2 ) ] * | avg - T | ]
-                outputs[lt_avg] = outputs[lt_avg].clone().detach() + ((outputs[lt_avg].clone().detach() + (targets[lt_avg].clone().detach() - (outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach())) ** 2) * torch.abs(targets[lt_avg].clone().detach() - average_score) / average_score)
-            if len(gt_avg) > 0:
-                # O* = O - [ [ O - ( T + ( O - T ) ^ 2 ) ] * | avg - T | ]
-                outputs[gt_avg] = outputs[gt_avg].clone().detach() - ((outputs[gt_avg].clone().detach() - (targets[gt_avg].clone().detach() + (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach())) ** 2) * torch.abs(targets[gt_avg].clone().detach() - average_score) / average_score)
+            lt_avg = torch.where((targets < average_score) & (outputs < targets))[0]
+            gt_avg = torch.where((targets > average_score) & (outputs > targets))[0]
+            if factor > 1.0:
+                if len(lt_avg) > 0:
+                    # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * | avg - T | ) ]
+                    outputs[lt_avg] = outputs[lt_avg].clone().detach() + ( (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ( (  torch.abs(outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()) ** factor) * (1-torch.abs(targets[lt_avg].clone().detach() - average_score)) ) ) # / average_score
+                if len(gt_avg) > 0:
+                    # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * | avg - T | ) ]
+                    outputs[gt_avg] = outputs[gt_avg].clone().detach() - ( (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ( (  torch.abs(outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) ** factor) * (1 - torch.abs(targets[gt_avg].clone().detach() - average_score)) )) # / average_score
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
             # logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
             # train_abs = torch.mean(torch.abs_(outputs - targets.cuda()))
             loss_list["train"]["outputs_list"].extend(outputs_original.detach().cpu().numpy())
+            loss_list["train"]["outputs_list2"].extend(outputs.detach().cpu().numpy())
             loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["train"]["mse"] += [mse_loss.item()]
             loss_list["train"]["abs_error"] += [mse_loss.item()]
@@ -385,9 +423,13 @@ def train(training_folders,
             del loss, outputs, targets, audio, mse_loss, noisy, outputs_original  # , energy_loss
         losses["train"]["mse"] += [float(np.mean(loss_list["train"]["mse"]))]
         losses["train"]["abs_error"] += [float(np.mean(loss_list["train"]["abs_error"]))]
+
         performance_per_score(loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"],
                               results_path="figures",
-                              filename="scores_performance_train.png", n=80)
+                              filename="scores_performance_train.png", n=80, noise=is_noisy)
+        performance_per_score(loss_list["train"]["outputs_list2"], loss_list["train"]["targets_list"],
+                              results_path="figures",
+                              filename="scores_performance_train_corrected.png", n=80, noise=is_noisy)
         del loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"]
         if epoch % epochs_per_checkpoint == 0:
             print("Epoch: {}:\tTrain Loss: {:.3f}, Energy loss: {:.3f}".format(epoch, losses["train"]["mse"][-1],
@@ -396,29 +438,30 @@ def train(training_folders,
 
         model.eval()
         for i, batch in enumerate(valid_loader):
-            audio, targets, sampling_rate = batch
-            audio = audio.cuda()
-            outputs = model(audio.unsqueeze(1)).squeeze()
-            # energy_loss = shannon_entropy(outputs, targets.cuda()).mean()
-            mse_loss = criterion(outputs, targets.cuda())
-            loss = mse_loss
-            # logger.add_scalar('training loss', np.log2(loss.item()), i + len(train_loader) * epoch)
-            loss_list["valid"]["outputs_list"].extend(outputs.detach().cpu().numpy())
+            audios, targets, sampling_rate = batch
+            audios = torch.stack([audio.cuda() for audio in audios]).view(3, -1, 300000)
+
+            outputs = [model(audio.unsqueeze(1)).squeeze() for audio in audios]
+
+            mse_losses = torch.stack([criterion(out, targets.cuda()) for out in outputs])
+            mse_loss = torch.min(mse_losses)
+            argmin = int(torch.argmin(mse_losses))
+            loss_list["valid"]["outputs_list"].extend(outputs[argmin].detach().cpu().numpy())
             loss_list["valid"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["valid"]["mse"] += [mse_loss.item()]
             loss_list["valid"]["abs_error"] += [mse_loss.item()]
-            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs - targets.cuda()).detach().cpu().numpy())
-            del loss, audio, outputs, targets  # , energy_loss
+            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs[argmin] - targets.cuda()).detach().cpu().numpy())
+            del mse_loss, mse_losses, audios, outputs, targets  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["abs_error"] += [float(np.mean(loss_list["valid"]["abs_error"]))]
         boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
                         filename="boxplot_valid_performance_per_genre_valid.png", offset=20)
 
         if epoch % epochs_per_checkpoint == 0:
-            checkpoint_path = "{}/classif_ckpt/cnn".format(output_directory)
-            save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_path, channel, n_res_block,
+
+            save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_complete_name, channel, n_res_block,
                             n_res_channel, stride, dense_layers_sizes, is_bns, is_dropouts, activation,
-                            final_activation, drop_val)
+                            final_activation, drop_val, model_type)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["abs_error"][-1]))
@@ -472,6 +515,6 @@ if __name__ == "__main__":
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
           fp16_run=True,
-          checkpoint_path="classif_ckpt/cnn")
+          checkpoint_path="classif_ckpt/cnn_corr_normal_init")
 
 """

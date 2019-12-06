@@ -43,12 +43,13 @@ class Wave2tensor(torch.utils.data.Dataset):
     """
     All folders must be in the same parent folder
     """
-    def __init__(self, folders, scores_files, segment_length, valid=False, all=False):
+    def __init__(self, folders, scores_files, segment_length, valid=False, all=False, pred=False):
         train_lim = None
         scores = None
         files_list = None
         self.audio_files = []
         self.scores = []
+        self.valid = valid
         for i, folder in enumerate(folders):
             if scores_files is not None:
                 try:
@@ -70,6 +71,8 @@ class Wave2tensor(torch.utils.data.Dataset):
                 if scores_files is not None:
                     scores = scores[train_lim:]
                     self.scores.extend(scores)
+            elif pred:
+                self.audio_files.extend(files_list)
             else:
                 self.audio_files.extend(files_list)
                 self.scores.extend(scores)
@@ -92,14 +95,21 @@ class Wave2tensor(torch.utils.data.Dataset):
         self.sampling_rate = sampling_rate
 
         # Take segment
-        if audio.size(0) >= self.segment_length:
-            max_audio_start = audio.size(0) - self.segment_length
-            audio_start = random.randint(0, max_audio_start)
-            audio = audio[audio_start:audio_start+self.segment_length]
-        else:
-            audio = torch.nn.functional.pad(audio, (0, self.segment_length - audio.size(0)), 'constant').data
-        audio = audio / MAX_WAV_VALUE
+        if not self.valid:
+            if audio.size(0) >= self.segment_length:
+                max_audio_start = audio.size(0) - self.segment_length
+                audio_start = random.randint(0, max_audio_start)
+                audio = audio[audio_start:audio_start+self.segment_length]
+            else:
+                audio = torch.nn.functional.pad(audio, (0, self.segment_length - audio.size(0)), 'constant').data
+            audio = audio / MAX_WAV_VALUE
 
+        else:
+            max_audio_start = audio.size(0) - self.segment_length
+            audios = []
+            for audio_start in [0, int(max_audio_start/2), max_audio_start]:
+                audios += [audio[audio_start:audio_start+self.segment_length] / MAX_WAV_VALUE]
+            audio = audios
         return audio, targets, sampling_rate
 
     def __len__(self):
