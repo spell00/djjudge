@@ -49,7 +49,7 @@ if __name__ == "__main__":
           final_activation=torch.nn.Hardtanh(min_val=-0.4, max_val=1.4),
           noise=0.02,
           loss_type=torch.nn.MSELoss,
-          factor=1.2,
+          factor=0.5,
           flat_extrems=False,
           model_type="simplecnn1d"
           )

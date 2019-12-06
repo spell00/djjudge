@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from .utils.utils import create_missing_folders
 
+if torch.cuda.is_available():
+    device = 'cuda'
+else:
+    device = "cpu"
 
 def rand_jitter(arr):
     stdev = .01 * (max(arr) - min(arr))
@@ -143,7 +147,7 @@ def predict(predict_folders,
                            activation=activation,
                            final_activation=final_activation,
                            drop_val=drop_val
-                           ).cuda()
+                           ).to(device)
     else:
         model = Simple1DCNN(
             activation=activation,
@@ -191,7 +195,7 @@ def predict(predict_folders,
         print(i, "/", len(loader))
         model.zero_grad()
         audio, _, sampling_rate = batch
-        audio = torch.autograd.Variable(audio).cuda()
+        audio = torch.autograd.Variable(audio).to(device)
         preds = model(audio.unsqueeze(1)).squeeze()
         predictions += [preds.detach().cpu().numpy()]
         loss_list["predict"]["outputs_list"] += [predictions[-1]]

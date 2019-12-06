@@ -1,5 +1,9 @@
 import torch
 from torch import nn
+if torch.cuda.is_available():
+    device = 'cuda'
+else:
+    device = "cpu"
 
 
 class Simple1DCNN(torch.nn.Module):
@@ -11,8 +15,8 @@ class Simple1DCNN(torch.nn.Module):
                  drop_val=0.5,
                  ):
         super(Simple1DCNN, self).__init__()
-        self.activation = activation.cuda()
-        self.activation = activation.cuda()
+        self.activation = activation.to(device)
+        self.activation = activation.to(device)
         self.is_bns = is_bns
         self.is_dropouts = is_dropouts
         self.final_activation = final_activation
@@ -28,15 +32,15 @@ class Simple1DCNN(torch.nn.Module):
         self.relu = torch.nn.ReLU()
         i = 0
         for ins, outs, ksize, stride in zip(in_channels, out_channels, kernel_sizes, strides):
-            self.layers += [torch.nn.Conv1d(in_channels=ins, out_channels=outs, kernel_size=ksize, stride=stride).cuda()]
+            self.layers += [torch.nn.Conv1d(in_channels=ins, out_channels=outs, kernel_size=ksize, stride=stride).to(device)]
             if self.pooling[i] == 1:
-                self.pooling_layers += [torch.nn.AdaptiveAvgPool1d(output_size=2).cuda()]
+                self.pooling_layers += [torch.nn.AdaptiveAvgPool1d(output_size=2).to(device)]
             else:
                 self.pooling_layers += [None]
-            self.bns += [nn.BatchNorm1d(num_features=outs).cuda()]
-            # self.lns += [nn.LayerNorm(normalized_shape=None).cuda()]
+            self.bns += [nn.BatchNorm1d(num_features=outs).to(device)]
+            # self.lns += [nn.LayerNorm(normalized_shape=None).to(device)]
             i += 1
-        self.dense1 = torch.nn.Linear(in_features=1233, out_features=1).cuda()
+        self.dense1 = torch.nn.Linear(in_features=1233, out_features=1).to(device)
         self.dropout = nn.Dropout(drop_val)
         self.layers = nn.ModuleList(self.layers)
 
@@ -167,13 +171,13 @@ class ConvResnet(nn.Module):
         self.is_bns = is_bns
         self.blocks = nn.Sequential(*blocks)
         for i in range(len(dense_layers_sizes)-1):
-            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1]).cuda()
+            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1]).to(device)
             if self.is_bns[i] == 1:
-                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i]).cuda()
+                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i]).to(device)
             else:
                 self.bns[i] = None
             if self.is_dropouts[i] == 1:
-                self.dropout[i] = nn.Dropout(drop_val).cuda()
+                self.dropout[i] = nn.Dropout(drop_val).to(device)
             else:
                 self.dropout[i] = None
 

@@ -11,6 +11,10 @@ import matplotlib.pylab as pylab
 from .utils.utils import create_missing_folders
 import math
 
+if torch.cuda.is_available():
+    device = 'cuda'
+else:
+    device = "cpu"
 
 def rand_jitter(arr):
     stdev = .01 * (max(arr) - min(arr))
@@ -151,7 +155,7 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
                                   is_dropouts=is_dropout,
                                   activation=activation,
                                   final_activation=final_activation,
-                                  drop_val=dropval).cuda()
+                                  drop_val=dropval).to(device)
     else:
         model_for_saving = Simple1DCNN(
             activation=activation,
@@ -167,57 +171,6 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
                 'val_loss': epoch,
                 'optimizer': optimizer.state_dict(),
                 'learning_rate': learning_rate}, filepath)
-
-
-def mse_corr(x, targets):
-    arr = []
-    for score, t in zip(x, targets):
-        arr += [score * t]
-    return torch.stack(arr).cuda()
-
-
-def nlll(x):
-    ent = []
-    for freq in x:
-        if freq > 0:
-            ent += [-freq * math.log(freq, 2)]
-        else:
-            ent += [torch.Tensor([0])[0].cuda()]
-        del freq
-    return torch.stack(ent)
-
-
-def test(
-        training_folders,
-        scores,
-        output_directory,
-        checkpoint_path=None, ):
-    torch.manual_seed(42)
-    model = Simple1DCNN().cuda()
-    criterion = nn.MSELoss()
-    # Load checkpoint if one exists
-    epoch = 0
-    if checkpoint_path is not None:
-        model, optimizer = load_checkpoint_for_test(checkpoint_path, model)
-        epoch += 1  # next epoch is epoch + 1
-
-    valid_set = Wave2tensor(training_folders, scores, segment_length=300000, valid=True)
-    valid_loader = DataLoader(valid_set, num_workers=0,
-                              shuffle=False,
-                              batch_size=1,
-                              pin_memory=False,
-                              drop_last=False)
-
-    model.eval()
-    valid_abs = []
-    for i, batch in enumerate(valid_loader):
-        audio, targets, sampling_rate = batch
-        audio = audio.cuda()
-        outputs = model(audio.unsqueeze(1)).squeeze()
-        valid_abs += [torch.mean(torch.abs_(outputs - targets.cuda())).item()]
-    boxplots_genres(valid_abs, results_path="figures/boxplots", filename="boxplot_valid_performance_per_genre",
-                    offset=20)
-    del valid_abs
 
 
 def train(training_folders,
@@ -270,7 +223,7 @@ def train(training_folders,
                            activation=activation,
                            final_activation=final_activation,
                            drop_val=drop_val
-                           ).cuda()
+                           ).to(device)
     else:
         model = Simple1DCNN(
             activation=activation,
@@ -351,13 +304,13 @@ def train(training_folders,
         for i, batch in enumerate(train_loader):
             model.zero_grad()
             audio, targets, sampling_rate = batch
-            audio = torch.autograd.Variable(audio).cuda()
+            audio = torch.autograd.Variable(audio).to(device)
             outputs = model(audio.unsqueeze(1)).squeeze()
             outputs_original = outputs.clone().detach()
             noisy = torch.rand(len(targets)).normal_() * noise
             targets += noisy
 
-            targets = targets.cuda()
+            targets = targets.to(device)
 
 
 
@@ -395,7 +348,7 @@ def train(training_folders,
 
             lt_avg = torch.where((targets < average_score) & (outputs < targets))[0]
             gt_avg = torch.where((targets > average_score) & (outputs > targets))[0]
-            if factor > 1.0:
+            if factor <= 1.0:
                 if len(lt_avg) > 0:
                     # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
                     outputs[lt_avg] = outputs[lt_avg].clone().detach() + ( (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ( (  torch.abs(outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (1 - torch.abs(targets[lt_avg].clone().detach() - average_score)) ) ) # / average_score
@@ -406,7 +359,7 @@ def train(training_folders,
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
             # logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
-            # train_abs = torch.mean(torch.abs_(outputs - targets.cuda()))
+            # train_abs = torch.mean(torch.abs_(outputs - targets.to(device)))
             loss_list["train"]["outputs_list"].extend(outputs_original.detach().cpu().numpy())
             loss_list["train"]["outputs_list2"].extend(outputs.detach().cpu().numpy())
             loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
@@ -439,18 +392,18 @@ def train(training_folders,
         model.eval()
         for i, batch in enumerate(valid_loader):
             audios, targets, sampling_rate = batch
-            audios = torch.stack([audio.cuda() for audio in audios]).view(3, -1, 300000)
+            audios = torch.stack([audio.to(device) for audio in audios]).view(3, -1, 300000)
 
             outputs = [model(audio.unsqueeze(1)).squeeze() for audio in audios]
 
-            mse_losses = torch.stack([criterion(out, targets.cuda()) for out in outputs])
-            mse_loss = torch.min(mse_losses)
+            mse_losses = torch.stack([criterion(out, targets.to(device)) for out in outputs])
+            mse_loss = torch.mean(mse_losses)
             argmin = int(torch.argmin(mse_losses))
             loss_list["valid"]["outputs_list"].extend(outputs[argmin].detach().cpu().numpy())
             loss_list["valid"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["valid"]["mse"] += [mse_loss.item()]
             loss_list["valid"]["abs_error"] += [mse_loss.item()]
-            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs[argmin] - targets.cuda()).detach().cpu().numpy())
+            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs[argmin] - targets.to(device)).detach().cpu().numpy())
             del mse_loss, mse_losses, audios, outputs, targets  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["abs_error"] += [float(np.mean(loss_list["valid"]["abs_error"]))]
