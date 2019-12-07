@@ -5,7 +5,6 @@ from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QWidget, QMainWindow, QPushButton, QHBoxLayout, QVBoxLayout, QSlider, QLabel, \
     QTreeWidget, QTreeWidgetItem, QAction, QFileDialog
-from fbs_runtime.application_context.PyQt5 import ApplicationContext
 from gui import Rating
 from jim import constants
 from gui import details
@@ -22,7 +21,12 @@ class App(QMainWindow):
         self.ctx = ctx
         self.playlist = []
         # Create a basic vlc instance
-        self.instance = vlc.Instance(["--audio-visual=visual", "--effect-list=spectrum"])
+        if platform.system() == "Windows":  # for Windows Midi codec
+            self.instance = vlc.Instance(["--audio-visual=visual", "--effect-list=spectrum",
+                                          "--soundfont=" + self.ctx.get_resource('midis/soundfont.sf2')])
+        else:
+            self.instance = vlc.Instance(["--audio-visual=visual", "--effect-list=spectrum"])
+
         self.mediaplayer = self.instance.media_player_new()
         self.title = 'Open Deep Jockey'
         self. width = 1024
@@ -78,14 +82,18 @@ class App(QMainWindow):
         playerArea.addLayout(player)
 
         if platform.system() == "Linux":  # for Linux using the X Server
+            print("Linux detected")
             self.mediaplayer.set_xwindow(int(imgPlayer.winId()))
         elif platform.system() == "Windows":  # for Windows
+            print("Windows detected")
             self.mediaplayer.set_hwnd(int(imgPlayer.winId()))
         elif platform.system() == "Darwin":  # for MacOS
+            print("MacOS detected")
             self.mediaplayer.set_nsobject(int(imgPlayer.winId()))
-
+        else:
+            print("fail to init vlc frame")
         # create rating widget
-        ratingWidget = Rating.RatingWidget()
+        ratingWidget = Rating.RatingWidget(self.ctx)
         ratingWidget.value_updated.connect(
             lambda value: self.rateFile(value)
         )

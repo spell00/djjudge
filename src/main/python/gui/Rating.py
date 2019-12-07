@@ -6,11 +6,12 @@ from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout
 class RatingWidget(QWidget):
     value_updated = pyqtSignal(int)
 
-    def __init__(self, parent=None):
+    def __init__(self, ctx, parent=None):
         super(RatingWidget, self).__init__(parent)
 
         # Set defaults.
         self._value = 0
+        self.ctx = ctx
 
         # Dynamically create QWidget layout.
         hbox = QHBoxLayout()
@@ -19,7 +20,7 @@ class RatingWidget(QWidget):
         # Add icons to the layout.
         self.icons = []
         for icon_value in range(0, 5):
-            icon_label = IconLabel(icon_value, parent=self)
+            icon_label = IconLabel(icon_value, self.ctx, parent=self)
             icon_label.mouse_enter_icon.connect(self._set_icons_visible)
             icon_label.mouse_leave_icon.connect(self._set_active_icons_visible)
             icon_label.mouse_release_icon.connect(self.set_icons_active)
@@ -65,21 +66,22 @@ class IconLabel(QLabel):
     mouse_leave_icon = pyqtSignal(QLabel)
     mouse_release_icon = pyqtSignal(QLabel)
 
-    def __init__(self, value, parent=None):
+    def __init__(self, value, ctx, parent=None):
         super(IconLabel, self).__init__(parent)
         self._active = False
         self._value = value
+        self.ctx = ctx
 
         # Enable mouse events without buttons being held down.
         self.setMouseTracking(True)
-        self.setPixmap(QPixmap('gui/star0.png'))
+        self.setPixmap(QPixmap(self.ctx.get_resource('images/star0.png')))
         self.installEventFilter(self)
 
     def set_image(self, value):  # Set the image for the label.
         if value:
-            self.setPixmap(QPixmap('gui/star1.png'))
+            self.setPixmap(QPixmap(self.ctx.get_resource('images/star1.png')))
         else:
-            self.setPixmap(QPixmap('gui/star0.png'))
+            self.setPixmap(QPixmap(self.ctx.get_resource('images/star0.png')))
 
     def eventFilter(self, obj, event):  # Event filter defining custom actions.
         # When the mouse _enters_ the label area, set the icon visible.
