@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=gui
+Type=Application
+Exec=/opt/gui/gui
+Terminal=false
+NoDisplay=false
+Categories=Utility;
+Version=0.0.0
+Icon=gui
