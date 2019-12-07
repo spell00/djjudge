@@ -1,7 +1,7 @@
 import torch
 # from djjudge.models.supervised.CNN_1D import *
 from djjudge.train_cnn import train
-
+from torch import nn
 if __name__ == "__main__":
 
     training_folders = [
@@ -37,19 +37,22 @@ if __name__ == "__main__":
     train(training_folders,
           scores,
           output_directory,
-          batch_size=8,
+          batch_size=16,
           epochs=1000,
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
-          fp16_run=False,
-          checkpoint_name="classif_ckpt/cnn_corr_log",
+          fp16_run=True,
+          checkpoint_name="classif_ckpt/cnn_corr_bayesian",
           is_bns=[0, 0],
           is_dropouts=[1, 1],
-          activation=torch.nn.PReLU(),
-          final_activation=torch.nn.Hardtanh(min_val=-0.4, max_val=1.4),
+          activation=torch.relu,
+          final_activation=None,
           noise=0.02,
           loss_type=torch.nn.MSELoss,
-          factor=0.5,
+          factor=1.0,
           flat_extrems=False,
-          model_type="simplecnn1d"
+          model_type="convresnet",
+          is_bayesian=True,
+          init_method=nn.init.kaiming_normal_,
+
           )

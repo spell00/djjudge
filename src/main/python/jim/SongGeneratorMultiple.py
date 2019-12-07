@@ -104,3 +104,5 @@ class SongGeneratorMultiple(object):
                                         utils.convertTicks2Beat(info[1], self.ticks_per_beat), volume)
         with open(constants.PATH_GENERATED_SONG, "wb") as output_file:
             self.MyMIDI.writeFile(output_file)
+        print("generateSong done")
+        return constants.PATH_GENERATED_SONG

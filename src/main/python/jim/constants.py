@@ -6,7 +6,13 @@ ENDC = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
-PATH_GENERATED_SONG = "jim/generated/generated_song3Mul.mid"
+VOLUME_MELODY = 127
+VOLUME_DRUMS = 100
+VOLUME_ACCOMPANIMENT = 60
+DIFFICULTY_LVL = 2
+
+
+PATH_GENERATED_SONG = "generated/generated_song3Mul.mid"
 
 instruments_dictionary = {
     1: "Acoustic Grand Piano",

@@ -1,8 +1,8 @@
 from midiutil.MidiFile import MIDIFile
-
 from jim import musicfunctions
 from jim import utils
 from jim import constants
+import numpy as np
 
 
 class SongGenerator(object):
@@ -28,7 +28,7 @@ class SongGenerator(object):
             voices_add = musicfunctions.createChorus(voices, octaves_augmentation=1)
             channel = self.song.channels[self.song.idx_melody[i]]
             voices_add_regularized = utils.deleteDuration0(
-                musicfunctions.rythmRegularization(voices, voices_add, 100, 1))
+                musicfunctions.rythmRegularization(voices, voices_add, 100, constants.DIFFICULTY_LVL))
             # print(voices_add_regularized)
             instrument_number = self.song.instruments_list[self.song.idx_melody[i]] - 1
             instrument_number = 0
@@ -60,9 +60,16 @@ class SongGenerator(object):
         self.MyMIDI = MIDIFile(len(self.tracks))
 
         for i in range(len(self.tracks)):
+            idx_channel = (self.song.channels).index(self.channels[i])
+            print(idx_channel)
+            if idx_channel in self.song.idx_melody:
+                volume = constants.VOLUME_MELODY
+            elif idx_channel in self.song.idx_drums:
+                volume = constants.VOLUME_DRUMS
+            else:
+                volume = constants.VOLUME_ACCOMPANIMENT
             track_voices = self.tracks[i]
             channel_voices = self.channels[i]
-            volume = 100  # 0-127, as per the MIDI standard
             self.MyMIDI.addTempo(track_voices, 0, self.BPM)
             notes = self.track_notes[i]
             self.MyMIDI.addProgramChange(track_voices, channel_voices, 0, self.track_instruments[i])

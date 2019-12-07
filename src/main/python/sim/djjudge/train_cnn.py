@@ -16,6 +16,7 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 
+
 def rand_jitter(arr):
     stdev = .01 * (max(arr) - min(arr))
     return arr + np.random.randn(len(arr)) * stdev
@@ -41,7 +42,8 @@ def boxplots_genres(scores, results_path, filename="boxplots_genres", offset=100
     del scores, scores_sorted_lists
 
 
-def performance_per_score(predicted_values, target_values, results_path, n, filename="scores_performance",valid=False, noise=False):
+def performance_per_score(predicted_values, target_values, results_path, n, filename="scores_performance", valid=False,
+                          noise=False):
     create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
     predicted_values = np.array(predicted_values)
@@ -141,28 +143,31 @@ def load_checkpoint_for_test(checkpoint_path, model):
 
 
 def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
-                    stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type):
+                    stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type,
+                    is_bayesian):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
     if model_type == "convresnet":
         model_for_saving = ConvResnet(in_channel=1,
-                                  channel=channel,
-                                  n_res_block=n_res_block,
-                                  n_res_channel=n_res_channel,
-                                  stride=stride,
-                                  dense_layers_sizes=dense_layers_size,
-                                  is_bns=is_bns,
-                                  is_dropouts=is_dropout,
-                                  activation=activation,
-                                  final_activation=final_activation,
-                                  drop_val=dropval).to(device)
+                                      channel=channel,
+                                      n_res_block=n_res_block,
+                                      n_res_channel=n_res_channel,
+                                      stride=stride,
+                                      dense_layers_sizes=dense_layers_size,
+                                      is_bns=is_bns,
+                                      is_dropouts=is_dropout,
+                                      activation=activation,
+                                      final_activation=final_activation,
+                                      drop_val=dropval,
+                                      is_bayesian=is_bayesian).to(device)
     else:
         model_for_saving = Simple1DCNN(
             activation=activation,
             final_activation=final_activation,
             drop_val=dropval,
             is_bns=is_bns,
-            is_dropouts=is_dropout
+            is_dropouts=is_dropout,
+            is_bayesian=is_bayesian
         )
 
     model_for_saving.load_state_dict(model.state_dict())
@@ -198,16 +203,18 @@ def train(training_folders,
           average_score=0.4,
           factor=2,
           flat_extrems=False,
-          model_type="convresnet"
+          model_type="convresnet",
+          is_bayesian=False
           ):
     if noise > 0.:
         is_noisy = True
     else:
         is_noisy = False
-    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type, str(init_method).split(" ")[1],
-                                                          str(activation).split('torch.')[0],
-                                                          str(final_activation).split('torch.')[0],
-                                                          str(is_bns), str(is_dropouts))
+    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
+                                                             str(init_method).split(" ")[1],
+                                                             str(activation).split('torch.')[0],
+                                                             str(final_activation).split('torch.')[0],
+                                                             str(is_bns), str(is_dropouts))
 
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
@@ -222,7 +229,8 @@ def train(training_folders,
                            is_dropouts=is_dropouts,
                            activation=activation,
                            final_activation=final_activation,
-                           drop_val=drop_val
+                           drop_val=drop_val,
+                           is_bayesian=is_bayesian
                            ).to(device)
     else:
         model = Simple1DCNN(
@@ -230,14 +238,12 @@ def train(training_folders,
             final_activation=final_activation,
             drop_val=drop_val,
             is_bns=is_bns,
-            is_dropouts=is_dropouts
+            is_dropouts=is_dropouts,
+            is_bayesian=is_bayesian
         )
     model.random_init(init_method=init_method)
     criterion = loss_type()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=learning_rate, amsgrad=True)
-    if fp16_run:
-        from apex import amp
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
 
     # Load checkpoint if one exists
     epoch = 0
@@ -271,7 +277,7 @@ def train(training_folders,
     # Get shared output_directory ready
     # logger = SummaryWriter(os.path.join(output_directory, 'logs'))
     epoch_offset = max(1, epoch)
-    lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=(epochs-epoch_offset) * len(train_loader))
+    lr_schedule = CycleScheduler(optimizer, learning_rate, n_iter=(epochs - epoch_offset) * len(train_loader))
     losses = {
         "train": {
             "abs_error": [],
@@ -282,6 +288,11 @@ def train(training_folders,
             "mse": [],
         }
     }
+    if fp16_run:
+        from apex import amp
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
+
+
     for epoch in range(epoch_offset, epochs):
         loss_list = {
             "train": {
@@ -311,8 +322,6 @@ def train(training_folders,
             targets += noisy
 
             targets = targets.to(device)
-
-
 
             """
             If predicted values are <= targets and the targets are also <= 0, then no correction
@@ -351,10 +360,20 @@ def train(training_folders,
             if factor <= 1.0:
                 if len(lt_avg) > 0:
                     # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
-                    outputs[lt_avg] = outputs[lt_avg].clone().detach() + ( (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ( (  torch.abs(outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (1 - torch.abs(targets[lt_avg].clone().detach() - average_score)) ) ) # / average_score
+                    outputs[lt_avg] = outputs[lt_avg].clone().detach() + (
+                                (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ((torch.abs(
+                            outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                                     1 - torch.abs(
+                                                                                                                 targets[
+                                                                                                                     lt_avg].clone().detach() - average_score))))  # / average_score
                 if len(gt_avg) > 0:
                     # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
-                    outputs[gt_avg] = outputs[gt_avg].clone().detach() - ( (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ( (  torch.abs(outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (1 - torch.abs(targets[gt_avg].clone().detach() - average_score)) )) # / average_score
+                    outputs[gt_avg] = outputs[gt_avg].clone().detach() - (
+                                (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ((torch.abs(
+                            outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                                     1 - torch.abs(
+                                                                                                                 targets[
+                                                                                                                     gt_avg].clone().detach() - average_score))))  # / average_score
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
@@ -403,7 +422,8 @@ def train(training_folders,
             loss_list["valid"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["valid"]["mse"] += [mse_loss.item()]
             loss_list["valid"]["abs_error"] += [mse_loss.item()]
-            loss_list["valid"]["valid_abs_all"].extend(torch.abs_(outputs[argmin] - targets.to(device)).detach().cpu().numpy())
+            loss_list["valid"]["valid_abs_all"].extend(
+                torch.abs_(outputs[argmin] - targets.to(device)).detach().cpu().numpy())
             del mse_loss, mse_losses, audios, outputs, targets  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["abs_error"] += [float(np.mean(loss_list["valid"]["abs_error"]))]
@@ -411,10 +431,9 @@ def train(training_folders,
                         filename="boxplot_valid_performance_per_genre_valid.png", offset=20)
 
         if epoch % epochs_per_checkpoint == 0:
-
             save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_complete_name, channel, n_res_block,
                             n_res_channel, stride, dense_layers_sizes, is_bns, is_dropouts, activation,
-                            final_activation, drop_val, model_type)
+                            final_activation, drop_val, model_type, is_bayesian)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["abs_error"][-1]))
