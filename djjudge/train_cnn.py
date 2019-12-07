@@ -210,10 +210,21 @@ def train(training_folders,
         is_noisy = True
     else:
         is_noisy = False
+
+    if len(str(activation).split(" ")) > 1:
+        activation_string = str(activation).split(" ")[2]
+    else:
+        activation_string = str(activation).split('torch.')[0]
+
+    if len(str(final_activation).split(" ")) > 1:
+        final_activation_string = str(final_activation).split(" ")[2]
+    else:
+        final_activation_string = str(final_activation).split('torch.')[0]
+
     checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
                                                              str(init_method).split(" ")[1],
-                                                             str(activation).split('torch.')[0],
-                                                             str(final_activation).split('torch.')[0],
+                                                             activation_string,
+                                                             final_activation_string,
                                                              str(is_bns), str(is_dropouts))
 
     torch.manual_seed(42)
@@ -286,6 +297,7 @@ def train(training_folders,
         "valid": {
             "abs_error": [],
             "mse": [],
+            "mse_loss_mle": [],
         }
     }
     if fp16_run:
@@ -308,6 +320,8 @@ def train(training_folders,
                 "mse": [],
                 "targets_list": [],
                 "outputs_list": [],
+                "outputs_list_mle": [],
+                "mse_loss_mle": []
             }
         }
 
@@ -416,17 +430,25 @@ def train(training_folders,
             outputs = [model(audio.unsqueeze(1)).squeeze() for audio in audios]
 
             mse_losses = torch.stack([criterion(out, targets.to(device)) for out in outputs])
-            mse_loss = torch.mean(mse_losses)
+            mse_loss = torch.min(mse_losses)
             argmin = int(torch.argmin(mse_losses))
+            abs = torch.abs_(outputs[argmin] - targets.to(device))
             loss_list["valid"]["outputs_list"].extend(outputs[argmin].detach().cpu().numpy())
             loss_list["valid"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["valid"]["mse"] += [mse_loss.item()]
-            loss_list["valid"]["abs_error"] += [mse_loss.item()]
-            loss_list["valid"]["valid_abs_all"].extend(
-                torch.abs_(outputs[argmin] - targets.to(device)).detach().cpu().numpy())
-            del mse_loss, mse_losses, audios, outputs, targets  # , energy_loss
+            loss_list["valid"]["valid_abs_all"].extend(abs.detach().cpu().numpy())
+
+            del mse_loss, mse_losses, outputs, argmin, abs  # , energy_loss
+
+            outputs_mle = [model.mle_forward(audio.unsqueeze(1)).squeeze() for audio in audios]
+            mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
+            mse_loss_mle = torch.min(mse_losses_mle)
+            argmin_mle = int(torch.argmin(mse_losses_mle))
+            loss_list["valid"]["outputs_list_mle"].extend(outputs_mle[argmin_mle].detach().cpu().numpy())
+            loss_list["valid"]["mse_loss_mle"] += [mse_loss_mle.item()]
+            del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
-        losses["valid"]["abs_error"] += [float(np.mean(loss_list["valid"]["abs_error"]))]
+        losses["valid"]["mse_loss_mle"] += [float(np.mean(loss_list["valid"]["mse_loss_mle"]))]
         boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
                         filename="boxplot_valid_performance_per_genre_valid.png", offset=20)
 
@@ -436,15 +458,18 @@ def train(training_folders,
                             final_activation, drop_val, model_type, is_bayesian)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
-                                                                               losses["valid"]["abs_error"][-1]))
+                                                                               losses["valid"]["mse_loss_mle"][-1]))
 
         plot_performance(losses["train"]["mse"], losses["valid"]["mse"], results_path="figures",
                          filename="training_MSEloss_trace_classification")
-        plot_performance(losses["train"]["abs_error"], losses["valid"]["abs_error"], results_path="figures",
-                         filename="training_mean_abs_diff_trace_classification")
+        # plot_performance(losses["train"]["mse_loss_mle"], losses["valid"]["mse_loss_mle"], results_path="figures",
+        #                  filename="training_mean_abs_diff_trace_classification")
         performance_per_score(loss_list["valid"]["outputs_list"], loss_list["valid"]["targets_list"],
                               results_path="figures",
                               filename="scores_performance_valid.png", n=20, valid=True)
+        performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
+                              results_path="figures",
+                              filename="scores_performance_valid_mle.png", n=20, valid=True)
         del loss_list
 
 
