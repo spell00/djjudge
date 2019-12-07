@@ -1,9 +1,57 @@
 import torch
-from torch import nn
+from ..utils.stochastic import GaussianSample
+from torch.autograd import Variable
+import torch.nn as nn
+import torch.nn.functional as F
+
 if torch.cuda.is_available():
     device = 'cuda'
 else:
     device = "cpu"
+import torch
+
+class Stochastic(nn.Module):
+    """
+    Base stochastic layer that uses the
+    reparametrization trick [Kingma 2013]
+    to draw a sample from a distribution
+    parametrised by mu and log_var.
+    """
+
+    def reparametrize(self, mu, log_var):
+        epsilon = Variable(torch.randn(mu.size()), requires_grad=False)
+
+        if mu.is_cuda:
+            epsilon = epsilon.to(device)
+
+        # log_std = 0.5 * log_var
+        # std = exp(log_std)
+        std = log_var.mul(0.5).exp_()
+
+        # z = std * epsilon + mu
+        z = mu.addcmul(std, epsilon)
+
+        return z
+
+
+class GaussianSample(Stochastic):
+    """
+    Layer that represents a sample from a
+    Gaussian distribution.
+    """
+
+    def __init__(self, in_features, out_features):
+        super(GaussianSample, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.mu = nn.Linear(in_features, out_features).to(device)
+        self.log_var = nn.Linear(in_features, out_features).to(device)
+
+    def forward(self, x):
+        mu = self.mu(x)
+        log_var = F.softplus(self.log_var(x))
+
+        return self.reparametrize(mu, log_var), mu, log_var
 
 
 class Simple1DCNN(torch.nn.Module):
@@ -13,9 +61,12 @@ class Simple1DCNN(torch.nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
+                 is_bayesian=False
                  ):
         super(Simple1DCNN, self).__init__()
-        self.activation = activation.to(device)
+        self.GaussianSample = GaussianSample(1, 1)
+        self.is_bayesian = is_bayesian
+
         self.activation = activation.to(device)
         self.is_bns = is_bns
         self.is_dropouts = is_dropouts
@@ -62,6 +113,10 @@ class Simple1DCNN(torch.nn.Module):
                 x = self.pooling_layers[i](x)
         x = x.squeeze()
         x = self.dense1(x)
+        if self.is_bayesian:
+            x, _, _ = self.GaussianSample.float()(x)
+        if self.final_activation is not None:
+            x = self.final_activation(x)
         x = self.final_activation(x)
 
         return x
@@ -108,9 +163,12 @@ class ConvResnet(nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
+                 is_bayesian=False
                  ):
         super().__init__()
-
+        self.is_bayesian = is_bayesian
+        if is_bayesian:
+            self.GaussianSample = GaussianSample(1, 1)
         if stride == 4:
             blocks = [
                 nn.Conv1d(in_channel, channel // 2, 4, stride=2, padding=1),
@@ -203,11 +261,13 @@ class ConvResnet(nn.Module):
             # TODO linear layers are not turning to float16
             x = dense(x.float())
             if i < len(self.bns)-2:
-                x = self.activation(x.float())
+                x = self.activation(x)
 
+        if self.is_bayesian:
+            # TODO GaussianSample turning to float16 (half), but x is float32 (float)
+            x, _, _ = self.GaussianSample.float()(x)
         if self.final_activation is not None:
             x = self.final_activation(x)
-        # x = self.linear3(x)
         return x
 
     def get_parameters(self):
