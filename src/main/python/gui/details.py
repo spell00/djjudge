@@ -4,6 +4,8 @@ from PyQt5.QtCore import QDirIterator, QUrl, Qt
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtMultimedia import QMediaContent
 from PyQt5.QtWidgets import QFileDialog
+from gui import generationOption
+from fbs_runtime.application_context.PyQt5 import ApplicationContext
 
 
 def setColors(self):
@@ -25,14 +27,23 @@ def setColors(self):
 
 
 def on_exit():
+    print("on_exit")
     sys.exit()
 
 
 def on_load():
-    print("load")
+    print("on_load")
+
 
 def on_option():
-    print("option")
+    ctx = ApplicationContext()       # 1. Instantiate ApplicationContext
+    option = generationOption.GenerationOption(ctx)
+    option.show()
+    print("on_option")
+
+
+def on_djjudge():
+    print("on_djjudge")
 
 
 def folderIterator(self):

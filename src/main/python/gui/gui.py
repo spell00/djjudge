@@ -5,10 +5,8 @@ from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QWidget, QMainWindow, QPushButton, QHBoxLayout, QVBoxLayout, QSlider, QLabel, \
     QTreeWidget, QTreeWidgetItem, QAction, QFileDialog
-from gui import Rating
-from jim import constants
-from gui import details
-from jim import musicfunctions
+from jim import constants, musicfunctions
+from gui import generationOption, Rating, details
 
 
 class App(QMainWindow):
@@ -29,9 +27,10 @@ class App(QMainWindow):
 
         self.mediaplayer = self.instance.media_player_new()
         self.title = 'Open Deep Jockey'
-        self. width = 1024
-        self. height = 512
-        self. left = 256
+        self.generateOption = generationOption.GenerationOption(self.ctx)
+        self.width = 1024
+        self.height = 512
+        self.left = 256
         self.top = 256
         self.tune = []
         self.init_ui()
@@ -157,7 +156,6 @@ class App(QMainWindow):
         else:
             print("TuneHandler error")
 
-
     def TuneHandler(self):
         # Tune buttun pushed
         print("TuneHandler")
@@ -228,35 +226,45 @@ class App(QMainWindow):
         # create menu
         menubar = self.menuBar()
 
+        # Standard menu
         # create Action
         loadAction = QAction("Load file", self)
         loadAction.setShortcut("Ctrl+L")
         loadAction.setStatusTip('Load file')
         # connect to function
         loadAction.triggered.connect(self.openFile)
-
         # create Action
         exitAction = QAction("Exit App", self)
         exitAction.setShortcut("Ctrl+W")
         exitAction.setStatusTip('Leave The App')
         # connect to function
         exitAction.triggered.connect(details.on_exit)
-
         # Add Actions to menu
         appMenu = menubar.addMenu('App')
         appMenu.addAction(loadAction)
         appMenu.addAction(exitAction)
 
+        # Generation from song menu
         # create Action
         optionAction = QAction("Generation options", self)
         optionAction.setShortcut("Ctrl+O")
         optionAction.setStatusTip('Setup generation options')
         # connect to function
-        optionAction.triggered.connect(details.on_option)
-
+        optionAction.triggered.connect(self.on_option)
         # Add Actions to menu
         genMenu = menubar.addMenu('Generation options')
         genMenu.addAction(optionAction)
+
+        # djjudge menu
+        # create Action
+        djjudgeAction = QAction("DjJudge", self)
+        djjudgeAction.setShortcut("Ctrl+D")
+        djjudgeAction.setStatusTip('DjJudge')
+        # connect to function
+        djjudgeAction.triggered.connect(details.on_djjudge)
+        # Add Actions to menu
+        genMenu = menubar.addMenu('DjJudge')
+        genMenu.addAction(djjudgeAction)
 
     def openFile(self):
         song = QFileDialog.getOpenFileName(None, 'Open Music Folder', '~', 'Sound Files(*.wav *.mid)')
@@ -285,3 +293,8 @@ class App(QMainWindow):
         for i in range(self.tree.topLevelItemCount()):
             self.tree.topLevelItem(i).setData(2, 0, "pending")
             print(self.tree.topLevelItem(i))
+
+    def on_option(self):
+        self.generateOption.resize(1024, 512)
+        self.generateOption.show()
+        print("on_option")
