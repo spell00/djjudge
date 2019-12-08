@@ -474,30 +474,31 @@ def train(training_folders,
 
 
 """
-training_folders = [
-    "C:/Users/simon/Documents/MIR/genres/blues/wav",
-    "C:/Users/simon/Documents/MIR/genres/classical/wav",
-    "C:/Users/simon/Documents/MIR/genres/country/wav",
-    "C:/Users/simon/Documents/MIR/genres/disco/wav",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
-    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
-    "C:/Users/simon/Documents/MIR/genres/metal/wav",
-    "C:/Users/simon/Documents/MIR/genres/pop/wav",
-    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
-    "C:/Users/simon/Documents/MIR/genres/rock/wav",
-]
-scores = [
-    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
-]
+appctx = ApplicationContext()
+    training_folders = [
+        appctx.get_resource("MIR/genres/blues/wav"),
+        appctx.get_resource("MIR/genres/classical/wav"),
+        appctx.get_resource("MIR/genres/country/wav"),
+        appctx.get_resource("MIR/genres/disco/wav"),
+        appctx.get_resource("MIR/genres/hiphop/wav"),
+        appctx.get_resource("MIR/genres/jazz/wav"),
+        appctx.get_resource("MIR/genres/metal/wav"),
+        appctx.get_resource("MIR/genres/pop/wav"),
+        appctx.get_resource("MIR/genres/reggae/wav"),
+        appctx.get_resource("MIR/genres/rock/wav")
+    ]
+    scores = [
+        appctx.get_resource("MIR/genres/blues/scores.csv"),
+        appctx.get_resource("MIR/genres/classical/scores.csv"),
+        appctx.get_resource("MIR/genres/country/scores.csv"),
+        appctx.get_resource("MIR/genres/disco/scores.csv"),
+        appctx.get_resource("MIR/genres/hiphop/scores.csv"),
+        appctx.get_resource("MIR/genres/jazz/scores.csv"),
+        appctx.get_resource("MIR/genres/metal/scores.csv"),
+        appctx.get_resource("MIR/genres/pop/scores.csv"),
+        appctx.get_resource("MIR/genres/reggae/scores.csv"),
+        appctx.get_resource("MIR/genres/rock/scores.csv")
+    ]
 output_directory = "C:/Users/simon/djjudge/"
 
 if __name__ == "__main__":

@@ -2,33 +2,34 @@ import torch
 
 from sim.djjudge.models.supervised import *
 from sim.djjudge.train_cnn import train
+from fbs_runtime.application_context.PyQt5 import ApplicationContext
 
 
-# DONT EXEC FROM HERE, exec from main !
-if __name__ == "__main__":
+def main(ctx):
+    appctx = ctx
     training_folders = [
-        "C:/Users/simon/Documents/MIR/genres/blues/wav",
-        "C:/Users/simon/Documents/MIR/genres/classical/wav",
-        "C:/Users/simon/Documents/MIR/genres/country/wav",
-        "C:/Users/simon/Documents/MIR/genres/disco/wav",
-        "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
-        "C:/Users/simon/Documents/MIR/genres/jazz/wav",
-        "C:/Users/simon/Documents/MIR/genres/metal/wav",
-        "C:/Users/simon/Documents/MIR/genres/pop/wav",
-        "C:/Users/simon/Documents/MIR/genres/reggae/wav",
-        "C:/Users/simon/Documents/MIR/genres/rock/wav",
+        appctx.get_resource("MIR/genres/blues/wav"),
+        appctx.get_resource("MIR/genres/classical/wav"),
+        appctx.get_resource("MIR/genres/country/wav"),
+        appctx.get_resource("MIR/genres/disco/wav"),
+        appctx.get_resource("MIR/genres/hiphop/wav"),
+        appctx.get_resource("MIR/genres/jazz/wav"),
+        appctx.get_resource("MIR/genres/metal/wav"),
+        appctx.get_resource("MIR/genres/pop/wav"),
+        appctx.get_resource("MIR/genres/reggae/wav"),
+        appctx.get_resource("MIR/genres/rock/wav")
     ]
     scores = [
-        "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
-        "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+        appctx.get_resource("MIR/genres/blues/scores.csv"),
+        appctx.get_resource("MIR/genres/classical/scores.csv"),
+        appctx.get_resource("MIR/genres/country/scores.csv"),
+        appctx.get_resource("MIR/genres/disco/scores.csv"),
+        appctx.get_resource("MIR/genres/hiphop/scores.csv"),
+        appctx.get_resource("MIR/genres/jazz/scores.csv"),
+        appctx.get_resource("MIR/genres/metal/scores.csv"),
+        appctx.get_resource("MIR/genres/pop/scores.csv"),
+        appctx.get_resource("MIR/genres/reggae/scores.csv"),
+        appctx.get_resource("MIR/genres/rock/scores.csv")
     ]
     output_directory = "C:/Users/simon/djjudge/"
 
@@ -45,3 +46,7 @@ if __name__ == "__main__":
           learning_rate=1e-3,
           fp16_run=True,
           checkpoint_name=None)
+
+# DONT EXEC FROM HERE, exec from main !
+if __name__ == "__main__":
+    main(ApplicationContext())
