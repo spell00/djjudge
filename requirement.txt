@@ -1,0 +1,15 @@
+altgraph==0.16.1
+fbs==0.8.4
+future==0.18.2
+MIDIUtil==1.2.1
+mido==1.2.9
+music21==5.7.1
+numpy==1.17.4
+pefile==2019.4.18
+PyInstaller==3.5
+PyQt5==5.13.1
+PyQt5-sip==12.7.0
+PyQt5-stubs==5.13.1.2
+python-vlc==3.0.7110
+pywin32==227
+pywin32-ctypes==0.2.0
