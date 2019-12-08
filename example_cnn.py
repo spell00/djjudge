@@ -45,7 +45,7 @@ if __name__ == "__main__":
           checkpoint_name="classif_ckpt/cnn_corr_bayesian_v3",
           is_bns=[1, 1],
           is_dropouts=[1, 1],
-          dense_layers_sizes=[32, 1],
+          dense_layers_sizes=[128, 1],
           activation=nn.PReLU(),
           final_activation=None,
           noise=0.02,

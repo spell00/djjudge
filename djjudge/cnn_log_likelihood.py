@@ -65,6 +65,9 @@ if __name__ == "__main__":
     worst_predictions = np.stack(np.flip(log_likelihoods))
     worst_predictions, worst_predictions_songs = torch.topk(torch.Tensor(worst_predictions), 10, largest=True)
     worst_predictions_names = [songs_list[s] for s in worst_predictions_songs.numpy().tolist()]
+    dataframe_worst_predictions = pd.DataFrame(np.concatenate((worst_predictions.detach().cpu().numpy().reshape(-1, 1),
+                                         np.array([name.split("/")[-1] for name in worst_predictions_names]).reshape(-1, 1)), 1),
+                                         columns=["scores", "songname"])
     print(worst_predictions_names, worst_predictions_songs)
 
     performance_per_score(worst_predictions, results_path='figures', filename="worst_nll_predicted.png")
@@ -74,6 +77,9 @@ if __name__ == "__main__":
     # largest log-likelihood are smaller
     best_predictions, best_predictions_songs = torch.topk(torch.Tensor(best_predictions), 10, largest=False)
     best_predictions_names = [songs_list[s] for s in best_predictions_songs.numpy().tolist()]
+    dataframe_best_predictions = pd.DataFrame(np.concatenate((best_predictions.detach().cpu().numpy().reshape(-1, 1),
+                                         np.array([name.split("/")[-1] for name in best_predictions_names]).reshape(-1, 1)), 1),
+                                         columns=["scores", "songname"])
     print(best_predictions_names, best_predictions_songs)
 
     performance_per_score(best_predictions, results_path='figures', filename="best_nll_predicted.png")
