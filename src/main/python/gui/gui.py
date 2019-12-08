@@ -62,7 +62,7 @@ class App(QMainWindow):
         QTreeWidgetItem(self.tree, [self.ctx.get_resource('midis/Hit_the_Road_Jack.mid'), '2', 'Example'])
         QTreeWidgetItem(self.tree, [self.ctx.get_resource('midis/Holiday.mid'), '4', 'Example'])
         # create Tune buttun
-        self.tuneBtn = QPushButton('Tune')  # Tune button
+        self.tuneBtn = QPushButton('Set to tune')  # Tune button
         self.generateBtn = QPushButton('Nothing to tune')  # generation button
         # Add elements to list zone
         listArea.addWidget(self.tree)
@@ -225,25 +225,38 @@ class App(QMainWindow):
             self.statusBar().showMessage(self.playlist[0])
 
     def initAct(self):
-        # Add to menu
+        # create menu
+        menubar = self.menuBar()
+
+        # create Action
         loadAction = QAction("Load file", self)
         loadAction.setShortcut("Ctrl+L")
         loadAction.setStatusTip('Load file')
         # connect to function
         loadAction.triggered.connect(self.openFile)
 
-        # Add to menu
+        # create Action
         exitAction = QAction("Exit App", self)
         exitAction.setShortcut("Ctrl+W")
         exitAction.setStatusTip('Leave The App')
         # connect to function
         exitAction.triggered.connect(details.on_exit)
 
-        # Add file menu
-        menubar = self.menuBar()
+        # Add Actions to menu
         appMenu = menubar.addMenu('App')
         appMenu.addAction(loadAction)
         appMenu.addAction(exitAction)
+
+        # create Action
+        optionAction = QAction("Generation options", self)
+        optionAction.setShortcut("Ctrl+O")
+        optionAction.setStatusTip('Setup generation options')
+        # connect to function
+        optionAction.triggered.connect(details.on_option)
+
+        # Add Actions to menu
+        genMenu = menubar.addMenu('Generation options')
+        genMenu.addAction(optionAction)
 
     def openFile(self):
         song = QFileDialog.getOpenFileName(None, 'Open Music Folder', '~', 'Sound Files(*.wav *.mid)')

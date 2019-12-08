@@ -31,7 +31,7 @@ def main(ctx):
         appctx.get_resource("MIR/genres/reggae/scores.csv"),
         appctx.get_resource("MIR/genres/rock/scores.csv")
     ]
-    output_directory = "C:/Users/simon/djjudge/"
+    output_directory = appctx.get_resource("output")
 
     num_gpus = torch.cuda.device_count()
 

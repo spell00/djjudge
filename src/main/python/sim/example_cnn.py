@@ -1,7 +1,9 @@
 import torch
 # from djjudge.models.supervised.CNN_1D import *
-from djjudge.train_cnn import train
+from sim.djjudge.train_cnn import train
 from torch import nn
+
+
 if __name__ == "__main__":
 
     training_folders = [

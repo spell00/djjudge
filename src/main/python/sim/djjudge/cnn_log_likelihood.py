@@ -1,16 +1,19 @@
-from djjudge.models.supervised.CNN_1D import *
-from djjudge.utils.log_likelihood import calculate_likelihood
+from sim.djjudge.models.supervised.CNN_1D import *
+from sim.djjudge.utils.log_likelihood import calculate_likelihood
 from torch import nn
 from torch.utils.data import DataLoader
-from djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
+from sim.djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 import pandas as pd
-from djjudge.utils.utils import create_missing_folders
+from sim.djjudge.utils.utils import create_missing_folders
+from fbs_runtime.application_context.PyQt5 import ApplicationContext
 
-spotify = ["/home/simon/Desktop/spotify/potpourri"]
-checkpoint_path="classif_ckpt/cnn_corr_bayesian_v3_convresnet_kaiming_uniform__PReLU(num_parameters=1)_None_[1, 1]_[1, 1]_[128, 1]_last"
+spotify = ["/home/simon/Desktop/spotify/potpourri"]  # local
+checkpoint_path = "classif_ckpt/cnn_corr_bayesian_v3_convresnet_kaiming_uniform__PReLU(num_parameters=1)_None_[1, 1]_[1, 1]_[128, 1]_last"
+
+
 def performance_per_score(predicted_values, results_path, filename="scores_performance"):
     create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
@@ -27,13 +30,13 @@ def performance_per_score(predicted_values, results_path, filename="scores_perfo
     del predicted_values, results_path
 
 
-if __name__ == "__main__":
+def main(ctx):
     model = ConvResnet(in_channel=1,
                        channel=256,
                        n_res_block=4,
                        n_res_channel=256,
                        stride=4,
-                       dense_layers_sizes=[256, 32, 1],
+                       dense_layers_sizes=[256, 128, 1],
                        is_bns=[1, 1],
                        is_dropouts=[1, 1],
                        activation=nn.PReLU(),
@@ -42,14 +45,15 @@ if __name__ == "__main__":
                        is_bayesian=True,
                        random_node="last"
                        ).to(device)
-    dense_layers_sizes = [256, 32, 1]
+    dense_layers_sizes = [256, 128, 1]
 
-    checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
+    checkpoint_dict = torch.load(ctx.get_resource(checkpoint_path), map_location='cpu')
     epoch = checkpoint_dict['epoch']
     model_for_loading = checkpoint_dict['model']
-    model.load_state_dict(model_for_loading.state_dict())
-    print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
-    predict_set = Wave2tensor(spotify, scores_files=None, segment_length=300000, all=True, valid=False, pred=True)
+    # model.load_state_dict(model_for_loading.state_dict())
+    model.load_state_dict(model_for_loading)
+    print("Loaded checkpoint '{}' (epoch {})".format(ctx.get_resource(checkpoint_path), epoch))
+    predict_set = Wave2tensor([ctx.get_resource("spotify/potpourri")], scores_files=None, segment_length=300000, all=True, valid=False, pred=True)
     songs_list = predict_set.audio_files
     # boxplots_genres(predict_set.scores, results_path="figures")
 
@@ -70,7 +74,7 @@ if __name__ == "__main__":
                                          columns=["scores", "songname"])
     print(worst_predictions_names, worst_predictions_songs)
 
-    performance_per_score(worst_predictions, results_path='figures', filename="worst_nll_predicted.png")
+    performance_per_score(worst_predictions, results_path=ctx.get_resource("figures"), filename="worst_nll_predicted.png")
 
     best_predictions = np.stack(log_likelihoods)
 
@@ -82,7 +86,7 @@ if __name__ == "__main__":
                                          columns=["scores", "songname"])
     print(best_predictions_names, best_predictions_songs)
 
-    performance_per_score(best_predictions, results_path='figures', filename="best_nll_predicted.png")
+    performance_per_score(best_predictions, results_path=ctx.get_resource('figures'), filename="best_nll_predicted.png")
 
     ys = torch.stack(ys)
     best_scores, best_songs = torch.topk(torch.mean(ys, 1).view(-1), 10, largest=True, sorted=True)
@@ -91,7 +95,7 @@ if __name__ == "__main__":
                                          np.array([name.split("/")[-1] for name in best_scores_names]).reshape(-1, 1)), 1),
                                          columns=["scores", "songname"])
     print(dataframe_best_scores)
-    performance_per_score(best_scores.detach().cpu(), results_path='figures', filename="best_scores_nll_performance_predicted.png")
+    performance_per_score(best_scores.detach().cpu(), results_path=ctx.get_resource('figures'), filename="best_scores_nll_performance_predicted.png")
 
     worst_scores, worst_songs = torch.topk(torch.mean(ys, 1).view(-1), 10, largest=False, sorted=True)
     worst_scores_names = [songs_list[s] for s in best_songs.detach().cpu().numpy().tolist()]
@@ -100,11 +104,15 @@ if __name__ == "__main__":
                                          columns=["scores", "songname"])
     print(dataframe_worst_scores)
 
-    performance_per_score(worst_scores.detach().cpu(), results_path='figures', filename="worst_scores_nll_performance_predicted.png")
+    performance_per_score(worst_scores.detach().cpu(), results_path=ctx.get_resource('figures'), filename="worst_scores_nll_performance_predicted.png")
 
-    performance_per_score(torch.mean(ys, 1).view(-1).sort()[0].detach().cpu(), results_path='figures', filename="all_scores_predicted.png")
+    performance_per_score(torch.mean(ys, 1).view(-1).sort()[0].detach().cpu(), results_path=ctx.get_resource('figures'), filename="all_scores_predicted.png")
 
-    performance_per_score(torch.Tensor(log_likelihoods).view(-1).sort()[0].detach().cpu(), results_path='figures', filename="all_nll_performance_predicted.png")
+    performance_per_score(torch.Tensor(log_likelihoods).view(-1).sort()[0].detach().cpu(), results_path=ctx.get_resource('figures'), filename="all_nll_performance_predicted.png")
 
     # TODO put GUI here!
     # TODO inputs:
+
+
+if __name__ == "__main__":
+    main(ApplicationContext())
