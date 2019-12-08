@@ -144,7 +144,7 @@ def load_checkpoint_for_test(checkpoint_path, model):
 
 def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
                     stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type,
-                    is_bayesian):
+                    is_bayesian, random_node):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
     if model_type == "convresnet":
@@ -159,7 +159,8 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
                                       activation=activation,
                                       final_activation=final_activation,
                                       drop_val=dropval,
-                                      is_bayesian=is_bayesian).to(device)
+                                      is_bayesian=is_bayesian,
+                                      random_node=random_node).to(device)
     else:
         model_for_saving = Simple1DCNN(
             activation=activation,
@@ -204,8 +205,11 @@ def train(training_folders,
           factor=2,
           flat_extrems=False,
           model_type="convresnet",
-          is_bayesian=False
+          is_bayesian=False,
+          random_node="output",
+          get_mle=False
           ):
+
     if noise > 0.:
         is_noisy = True
     else:
@@ -241,7 +245,8 @@ def train(training_folders,
                            activation=activation,
                            final_activation=final_activation,
                            drop_val=drop_val,
-                           is_bayesian=is_bayesian
+                           is_bayesian=is_bayesian,
+                           random_node=random_node
                            ).to(device)
     else:
         model = Simple1DCNN(
@@ -250,7 +255,8 @@ def train(training_folders,
             drop_val=drop_val,
             is_bns=is_bns,
             is_dropouts=is_dropouts,
-            is_bayesian=is_bayesian
+            is_bayesian=is_bayesian,
+            random_node=random_node
         )
     model.random_init(init_method=init_method)
     criterion = loss_type()
@@ -331,7 +337,7 @@ def train(training_folders,
             model.zero_grad()
             audio, targets, sampling_rate = batch
             audio = torch.autograd.Variable(audio).to(device)
-            outputs = model(audio.unsqueeze(1)).squeeze()
+            outputs = model(audio.unsqueeze(1), random_node=random_node).squeeze()
             outputs_original = outputs.clone().detach()
             noisy = torch.rand(len(targets)).normal_() * noise
             targets += noisy
@@ -428,7 +434,7 @@ def train(training_folders,
             audios, targets, sampling_rate = batch
             audios = torch.stack([audio.to(device) for audio in audios]).view(3, -1, 300000)
 
-            outputs = [model(audio.unsqueeze(1)).squeeze() for audio in audios]
+            outputs = [model(audio.unsqueeze(1), random_node=random_node).squeeze() for audio in audios]
 
             mse_losses = torch.stack([criterion(out, targets.to(device)) for out in outputs])
             mse_loss = torch.min(mse_losses)
@@ -440,14 +446,14 @@ def train(training_folders,
             loss_list["valid"]["valid_abs_all"].extend(abs.detach().cpu().numpy())
 
             del mse_loss, mse_losses, outputs, argmin, abs  # , energy_loss
-
-            outputs_mle = [model.mle_forward(audio.unsqueeze(1)).squeeze() for audio in audios]
-            mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
-            mse_loss_mle = torch.min(mse_losses_mle)
-            argmin_mle = int(torch.argmin(mse_losses_mle))
-            loss_list["valid"]["outputs_list_mle"].extend(outputs_mle[argmin_mle].detach().cpu().numpy())
-            loss_list["valid"]["mse_loss_mle"] += [mse_loss_mle.item()]
-            del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
+            if get_mle:
+                outputs_mle = [model.mle_forward(audio.unsqueeze(1), random_node=random_node).squeeze() for audio in audios]
+                mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
+                mse_loss_mle = torch.min(mse_losses_mle)
+                argmin_mle = int(torch.argmin(mse_losses_mle))
+                loss_list["valid"]["outputs_list_mle"].extend(outputs_mle[argmin_mle].detach().cpu().numpy())
+                loss_list["valid"]["mse_loss_mle"] += [mse_loss_mle.item()]
+                del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["mse_loss_mle"] += [float(np.mean(loss_list["valid"]["mse_loss_mle"]))]
         boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
@@ -456,7 +462,7 @@ def train(training_folders,
         if epoch % epochs_per_checkpoint == 0:
             save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_complete_name, channel, n_res_block,
                             n_res_channel, stride, dense_layers_sizes, is_bns, is_dropouts, activation,
-                            final_activation, drop_val, model_type, is_bayesian)
+                            final_activation, drop_val, model_type, is_bayesian, random_node)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["mse_loss_mle"][-1]))
@@ -468,9 +474,10 @@ def train(training_folders,
         performance_per_score(loss_list["valid"]["outputs_list"], loss_list["valid"]["targets_list"],
                               results_path="figures",
                               filename="scores_performance_valid.png", n=20, valid=True)
-        performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
-                              results_path="figures",
-                              filename="scores_performance_valid_mle.png", n=20, valid=True)
+        if get_mle:
+            performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
+                                  results_path="figures",
+                                  filename="scores_performance_valid_mle.png", n=20, valid=True)
         del loss_list
 
 

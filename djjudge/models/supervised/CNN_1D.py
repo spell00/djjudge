@@ -65,10 +65,15 @@ class Simple1DCNN(torch.nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
-                 is_bayesian=False
+                 is_bayesian=False,
+                 random_node="output"
                  ):
         super(Simple1DCNN, self).__init__()
-        self.GaussianSample = GaussianSample(1, 1)
+        if is_bayesian:
+            if random_node == "output":
+                self.GaussianSample = GaussianSample(1, 1)
+            elif(random_node == "last"):
+                self.GaussianSample = GaussianSample(1233, 1233)
         self.is_bayesian = is_bayesian
 
         self.activation = activation.to(device)
@@ -167,12 +172,16 @@ class ConvResnet(nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
-                 is_bayesian=False
+                 is_bayesian=False,
+                 random_node="output"
                  ):
         super().__init__()
         self.is_bayesian = is_bayesian
         if is_bayesian:
-            self.GaussianSample = GaussianSample(1, 1)
+            if random_node == "output":
+                self.GaussianSample = GaussianSample(1, 1)
+            elif(random_node == "last"):
+                self.GaussianSample = GaussianSample(dense_layers_sizes[-2], dense_layers_sizes[-2])
         if stride == 4:
             blocks = [
                 nn.Conv1d(in_channel, channel // 2, 4, stride=2, padding=1),
@@ -254,7 +263,7 @@ class ConvResnet(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def forward(self, input):
+    def forward(self, input, random_node):
         x = self.blocks(input)
         x = x.view(-1, 256)
         if self.is_bns[0]:
@@ -264,6 +273,9 @@ class ConvResnet(nn.Module):
             if is_drop:
                 x = self.dropout[i](x)
             # TODO linear layers are not turning to float16
+            if random_node == "last" and i == len(self.bns)-2:
+                x, _, _ = self.GaussianSample.float()(x)
+
             x = dense(x.float())
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
@@ -274,21 +286,24 @@ class ConvResnet(nn.Module):
             if self.final_activation is not None:
                 x = self.final_activation(x)
             # TODO GaussianSample turning to float16 (half), but x is float32 (float)
-            y, _, _ = self.GaussianSample.float()(x)
+            if random_node == "output":
+                y, _, _ = self.GaussianSample.float()(x)
         else:
             if self.final_activation is not None:
                 y = self.final_activation(x)
         return y
 
-    def mle_forward(self, input):
+    def mle_forward(self, input, random_node):
         x = self.blocks(input)
         x = x.view(-1, 256)
         if self.is_bns[0]:
             x = self.bns[0](x)
         for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
-            # TODO linear layers are not turning to float16
+            # linear layers are not turning to float16
             if is_drop:
                 x = self.dropout[i](x)
+            if random_node == "last" and i == len(self.bns)-2:
+                x, _, _ = self.GaussianSample.float()(x)
             x = dense(x.float())
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
@@ -296,8 +311,10 @@ class ConvResnet(nn.Module):
                 x = self.activation(x)
 
         assert self.is_bayesian
-        # TODO GaussianSample turning to float16 (half), but x is float32 (float)
-        y = self.GaussianSample.float().mle(x)
+        # GaussianSample turning to float16 (half), but x is float32 (float)
+        # y = self.GaussianSample.float().mle(x)
+        if random_node == "output":
+            y, _, _ = self.GaussianSample.float()(x)
         if self.final_activation is not None:
             y = self.final_activation(y)
         return y
