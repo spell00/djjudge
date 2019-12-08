@@ -1,6 +1,8 @@
 import os.path
 import time
-from ....data_preparation.audio_data import *
+
+from sim.djjudge.data_preparation.audio_data import *
+from sim.djjudge.models.unsupervised.wavenet.wavenet_modules import DilatedQueue
 from torch import nn
 from torch.nn import functional as F
 

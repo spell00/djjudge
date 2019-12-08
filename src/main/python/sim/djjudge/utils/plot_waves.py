@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from djjudge.utils.utils import create_missing_folders
+
+from sim.djjudge.utils.utils import create_missing_folders
 
 
 def plot_waves(wave1,

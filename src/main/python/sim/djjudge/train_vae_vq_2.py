@@ -1,17 +1,18 @@
-from .utils.CycleAnnealScheduler import CycleScheduler
-from torch.utils.data import DataLoader
-from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
 import torch
 import numpy as np
+
+from sim.djjudje.utils.CycleAnnealScheduler import CycleScheduler
+from torch.utils.data import DataLoader
+from sim.djjudje.data_preparation.load_wavs_as_tensor import Wave2tensor
 from tensorboardX import SummaryWriter
-from .models.unsupervised.VQVAE2 import VQVAE
-from .models.unsupervised.wavenet.wavenet import WaveNetEncoder
-from .utils.plot_performance import plot_performance
-from .utils.plot_waves import plot_waves
-from .utils.utils import create_missing_folders
+from sim.djjudje.models.unsupervised.VQVAE2 import VQVAE
+from sim.djjudje.models.unsupervised.wavenet.wavenet import WaveNetEncoder
+from sim.djjudje.utils.plot_performance import plot_performance
+from sim.djjudje.utils.plot_waves import plot_waves
+from sim.djjudje.utils.utils import create_missing_folders
 
 training_folders = [
     #"C:/Users/simon/Documents/MIR/genres/hiphop/wav/",

@@ -1,5 +1,5 @@
 import torch
-from ..utils.stochastic import GaussianSample
+#from ..utils.stochastic import GaussianSample
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,20 +18,20 @@ class Stochastic(nn.Module):
     parametrised by mu and log_var.
     """
 
-    def reparametrize(self, mu, log_var):
-        epsilon = Variable(torch.randn(mu.size()), requires_grad=False)
+    def reparametrize(self, beta, log_var, x):
+        epsilon = Variable(torch.randn(beta.size()), requires_grad=False)
 
-        if mu.is_cuda:
-            epsilon = epsilon.to(device)
+        epsilon = epsilon.to(device)
 
         # log_std = 0.5 * log_var
         # std = exp(log_std)
         std = log_var.mul(0.5).exp_()
 
-        # z = std * epsilon + mu
-        z = mu.addcmul(std, epsilon)
+        # y = x.T * beta + std * epsilon
 
-        return z
+        y = (x * beta).addcmul(std, epsilon)
+        assert y.shape[1] == 1
+        return y
 
 
 class GaussianSample(Stochastic):
@@ -44,14 +44,17 @@ class GaussianSample(Stochastic):
         super(GaussianSample, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.mu = nn.Linear(in_features, out_features).to(device)
+        self.beta = nn.Linear(in_features, out_features).to(device)
         self.log_var = nn.Linear(in_features, out_features).to(device)
 
     def forward(self, x):
-        mu = self.mu(x)
+        beta = self.beta(x)
         log_var = F.softplus(self.log_var(x))
 
-        return self.reparametrize(mu, log_var), mu, log_var
+        return self.reparametrize(beta, log_var, x), beta, log_var
+
+    def mle(self, x):
+        return self.beta(x)
 
 
 class Simple1DCNN(torch.nn.Module):
@@ -253,19 +256,45 @@ class ConvResnet(nn.Module):
     def forward(self, input):
         x = self.blocks(input)
         x = x.view(-1, 256)
+        if self.is_bns[0]:
+            x = self.bns[0](x)
+        x = self.activation(x)
         for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
-            if is_bn:
-                x = self.bns[i](x)
             if is_drop:
                 x = self.dropout[i](x)
             # TODO linear layers are not turning to float16
             x = dense(x.float())
             if i < len(self.bns)-2:
+                if self.is_bns[i + 1]:
+                    x = self.bns[i + 1](x)
                 x = self.activation(x)
 
         if self.is_bayesian:
+            if self.final_activation is not None:
+                x = self.final_activation(x)
             # TODO GaussianSample turning to float16 (half), but x is float32 (float)
             x, _, _ = self.GaussianSample.float()(x)
+        else:
+            if self.final_activation is not None:
+                x = self.final_activation(x)
+        return x
+
+    def mle_forward(self, input):
+        x = self.blocks(input)
+        x = x.view(-1, 256)
+        if self.is_bns[0]:
+            x = self.bns[0](x)
+        for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
+            # TODO linear layers are not turning to float16
+            x = dense(x.float())
+            if i < len(self.bns)-2:
+                if self.is_bns[i + 1]:
+                    x = self.bns[i + 1](x)
+                x = self.activation(x)
+
+        assert self.is_bayesian
+        # TODO GaussianSample turning to float16 (half), but x is float32 (float)
+        x = self.GaussianSample.float().mle(x)
         if self.final_activation is not None:
             x = self.final_activation(x)
         return x

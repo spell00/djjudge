@@ -1,4 +1,5 @@
-# Class from https://github.com/ex4sperans/variational-inference-with-normalizing-flows/blob/master/flow.pyimport numpy as np
+# Class from https://github.com/ex4sperans/variational-inference-with-normalizing-flows/blob/master/flow.py
+import numpy as np
 from torch import nn
 import torch
 from graveyard.densities import p_z

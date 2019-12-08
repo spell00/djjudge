@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from torch.autograd import Variable
-from djjudge.utils import MaskedConv2d, MaskedLinear
+from sim.djjudge.models.utils.masked_layer import MaskedConv2d, MaskedLinear
 
 
 class PlanarNormalizingFlow(nn.Module):

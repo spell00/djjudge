@@ -1,17 +1,19 @@
-from .utils.CycleAnnealScheduler import CycleScheduler
-from torch.utils.data import DataLoader
-from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import argparse
 import os
 import torch
 import numpy as np
+
+from .utils.CycleAnnealScheduler import CycleScheduler
+from torch.utils.data import DataLoader
+from .data_preparation.load_wavs_as_tensor import Wave2tensor
 from tensorboardX import SummaryWriter
 from .models.unsupervised.VAE_VQ import VariationalAutoencoderVQ
-
 from djjudge.utils.plot_performance import plot_performance
 from djjudge.utils.plot_waves import plot_waves
 from djjudge.utils.utils import create_missing_folders
+from scipy.io.wavfile import write
+
 
 training_folders = [
     "C:/Users/simon/Documents/MIR/genres/hiphop/wav/",
@@ -27,7 +29,6 @@ training_folders = [
     "C:/Users/simon/Documents/spotify/potpourri"
 ]
 output_directory = "C:/Users/simon/djjudge/checkpoints/"
-from scipy.io.wavfile import write
 
 
 def load_checkpoint(checkpoint_path, model, optimizer, z_dim, gated, in_channels, out_channels, kernel_sizes,

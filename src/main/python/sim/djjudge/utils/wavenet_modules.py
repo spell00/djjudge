@@ -1,7 +1,8 @@
 import math
 import torch
-from torch.autograd import Function, Variable
 import numpy as np
+
+from torch.autograd import Function, Variable
 
 
 def dilate(x, dilation, init_dilation=1, pad_start=True):

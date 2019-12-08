@@ -1,7 +1,10 @@
 import torch
-from djjudge.models.supervised.CNN_1D import *
-from djjudge.prediction import predict
 
+from sim.djjudge.models.supervised.CNN_1D import *
+from sim.djjudge.prediction import predict
+
+
+# DONT EXEC FROM HERE, exec from main !
 if __name__ == "__main__":
     spotify = [
         "/home/simon/Desktop/spotify/potpourri",

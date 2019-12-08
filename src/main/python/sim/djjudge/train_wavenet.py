@@ -1,10 +1,15 @@
-from .models.unsupervised.wavenet.wavenet import *
-from .data_preparation.audio_data import WavenetDataset
-from .utils.wavenet_training import *
-from .utils.model_logging import *
+import torch
+
+from sim.djjudge.models.unsupervised.wavenet.wavenet import *
+from sim.djjudge.data_preparation.audio_data import WavenetDataset
+from sim.djjudge.utils.wavenet_training import *
+from sim.djjudge.utils.model_logging import *
+
 
 dtype = torch.FloatTensor
 ltype = torch.LongTensor
+
+
 def load_checkpoint(checkpoint_path, model, name="wavenet"):
     # if checkpoint_path
     checkpoint_dict = torch.load(checkpoint_path + name, map_location='cpu')

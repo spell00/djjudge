@@ -1,9 +1,11 @@
 import torch
-from djjudge.models.supervised.simple1DCNN import *
-from djjudge.train_cnn import train
 
+from sim.djjudge.models.supervised import *
+from sim.djjudge.train_cnn import train
+
+
+# DONT EXEC FROM HERE, exec from main !
 if __name__ == "__main__":
-
     training_folders = [
         "C:/Users/simon/Documents/MIR/genres/blues/wav",
         "C:/Users/simon/Documents/MIR/genres/classical/wav",

@@ -1,12 +1,12 @@
-from .models.supervised.CNN_1D import Simple1DCNN, ConvResnet
-from torch.utils.data import DataLoader
-from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
-import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
+
+from sim.djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
+from torch.utils.data import DataLoader
+from sim.djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 from .utils.utils import create_missing_folders
 
 if torch.cuda.is_available():

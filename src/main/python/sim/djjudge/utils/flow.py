@@ -2,7 +2,7 @@
 import torch
 from torch.nn import functional as F
 from torch.autograd import Variable
-from djjudge.utils.utils import safe_log
+from sim.djjudge.utils.utils import safe_log
 import math
 
 import torch as t
@@ -88,7 +88,6 @@ class linIAF(nn.Module):
 
         self.z1_size = z1_size
         self.cuda = torch.cuda.is_available()
-
 
     def forward(self, L, z):
         '''

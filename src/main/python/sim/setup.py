@@ -1,9 +1,8 @@
-import os
 import sys
-from distutils.sysconfig import get_python_lib
 
 from distutils.core import setup
 from setuptools import find_packages
+
 
 CURRENT_PYTHON = sys.version_info[:2]
 

@@ -126,7 +126,7 @@ def dict_he_uniform(matrix_init):
 
 
 def validation_split(dataset, val_share=0.1):
-    from djjudge.models import PartialDataset
+    from sim.djjudge.models.utils.utils import PartialDataset
     val_offset = int(len(dataset) * (1 - val_share))
     return PartialDataset(dataset, 0, val_offset), PartialDataset(dataset, val_offset, len(dataset) - val_offset)
 
@@ -547,7 +547,7 @@ def plot_evaluation(list2d, name_file="valid.png", top=10):
 
 def get_example_datasets(home_folder="/Users/simonpelletier/", results_folder="results", data_folder="data",
                          destination_folder="annleukemia", silent=0):
-    from data_preparation.GeoParser import GeoParser
+    from sim.djjudge.data_preparation.GeoParser import GeoParser
 
     data_destination_folder = home_folder + "/" + data_folder + "/" + destination_folder
     results_destination_folder = home_folder + "/" + results_folder
