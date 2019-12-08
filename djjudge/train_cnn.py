@@ -209,7 +209,6 @@ def train(training_folders,
           random_node="output",
           get_mle=False
           ):
-
     if noise > 0.:
         is_noisy = True
     else:
@@ -225,11 +224,14 @@ def train(training_folders,
     else:
         final_activation_string = str(final_activation).split('torch.')[0]
 
-    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
-                                                             str(init_method).split(" ")[1],
-                                                             activation_string,
-                                                             final_activation_string,
-                                                             str(is_bns), str(is_dropouts))
+    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
+                                                                   str(init_method).split(" ")[1],
+                                                                   activation_string,
+                                                                   final_activation_string,
+                                                                   str(is_bns),
+                                                                   str(is_dropouts),
+                                                                   str(dense_layers_sizes),
+                                                                   random_node)
 
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
@@ -337,7 +339,9 @@ def train(training_folders,
             model.zero_grad()
             audio, targets, sampling_rate = batch
             audio = torch.autograd.Variable(audio).to(device)
-            outputs = model(audio.unsqueeze(1), random_node=random_node).squeeze()
+            outputs, _, _, _ = model(audio.unsqueeze(1), random_node=random_node)
+            del _
+            outputs = outputs.squeeze()
             outputs_original = outputs.clone().detach()
             noisy = torch.rand(len(targets)).normal_() * noise
             targets += noisy
@@ -382,29 +386,29 @@ def train(training_folders,
                 if len(lt_avg) > 0:
                     # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
                     outputs[lt_avg] = outputs[lt_avg].clone().detach() + (
-                                (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ((torch.abs(
-                            outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (
-                                                                                                                     1 - torch.abs(
-                                                                                                                 targets[
-                                                                                                                     lt_avg].clone().detach() - average_score))))  # / average_score
+                            (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ((torch.abs(
+                        outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                             1 - torch.abs(
+                                                                                                         targets[
+                                                                                                             lt_avg].clone().detach() - average_score))))  # / average_score
                 if len(gt_avg) > 0:
                     # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
                     outputs[gt_avg] = outputs[gt_avg].clone().detach() - (
-                                (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ((torch.abs(
-                            outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (
-                                                                                                                     1 - torch.abs(
-                                                                                                                 targets[
-                                                                                                                     gt_avg].clone().detach() - average_score))))  # / average_score
+                            (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ((torch.abs(
+                        outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                             1 - torch.abs(
+                                                                                                         targets[
+                                                                                                             gt_avg].clone().detach() - average_score))))  # / average_score
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
             # logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
-            # train_abs = torch.mean(torch.abs_(outputs - targets.to(device)))
+            train_abs = torch.mean(torch.abs_(outputs - targets.to(device)))
             loss_list["train"]["outputs_list"].extend(outputs_original.detach().cpu().numpy())
             loss_list["train"]["outputs_list2"].extend(outputs.detach().cpu().numpy())
             loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["train"]["mse"] += [mse_loss.item()]
-            loss_list["train"]["abs_error"] += [mse_loss.item()]
+            loss_list["train"]["abs_error"] += [train_abs.item()]
             if fp16_run:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -432,9 +436,10 @@ def train(training_folders,
         model.eval()
         for i, batch in enumerate(valid_loader):
             audios, targets, sampling_rate = batch
-            audios = torch.stack([audio.to(device) for audio in audios]).view(3, -1, 300000)
+            audios = torch.stack([audio.to(device) for audio in audios])  # .view(batch_size, -1, 300000)
 
-            outputs = [model(audio.unsqueeze(1), random_node=random_node).squeeze() for audio in audios]
+            outputs = [model(audio.unsqueeze(1), random_node=random_node) for audio in audios]
+            outputs = [output[0].squeeze() for output in outputs]
 
             mse_losses = torch.stack([criterion(out, targets.to(device)) for out in outputs])
             mse_loss = torch.min(mse_losses)
@@ -447,7 +452,9 @@ def train(training_folders,
 
             del mse_loss, mse_losses, outputs, argmin, abs  # , energy_loss
             if get_mle:
-                outputs_mle = [model.mle_forward(audio.unsqueeze(1), random_node=random_node).squeeze() for audio in audios]
+                outputs_mle = [model.mle_forward(audio.unsqueeze(1), random_node=random_node) for audio in
+                               audios]
+                outputs_mle = [output[0].squeeze() for output in outputs_mle]
                 mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
                 mse_loss_mle = torch.min(mse_losses_mle)
                 argmin_mle = int(torch.argmin(mse_losses_mle))

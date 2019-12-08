@@ -37,7 +37,7 @@ if __name__ == "__main__":
     train(training_folders,
           scores,
           output_directory,
-          batch_size=6,
+          batch_size=4,
           epochs=1000,
           epochs_per_checkpoint=1,
           learning_rate=3e-4,
@@ -45,15 +45,16 @@ if __name__ == "__main__":
           checkpoint_name="classif_ckpt/cnn_corr_bayesian_v3",
           is_bns=[1, 1],
           is_dropouts=[1, 1],
+          dense_layers_sizes=[32, 1],
           activation=nn.PReLU(),
           final_activation=None,
-          noise=0.0,
+          noise=0.02,
           loss_type=torch.nn.MSELoss,
           factor=1.1,
           flat_extrems=False,
           model_type="convresnet",
           is_bayesian=True,
           init_method=nn.init.kaiming_uniform_,
-          random_node="output",
-          get_mle=False
+          random_node="last",
+          get_mle=True
           )

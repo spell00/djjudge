@@ -31,7 +31,6 @@ class Stochastic(nn.Module):
         # mu is x.T * beta
         # y = mu _ std * epsilon
         y = (mu).addcmul(std, epsilon)
-        assert y.shape[1] == 1
         return y
 
 
@@ -274,8 +273,8 @@ class ConvResnet(nn.Module):
                 x = self.dropout[i](x)
             # TODO linear layers are not turning to float16
             if random_node == "last" and i == len(self.bns)-2:
-                x, _, _ = self.GaussianSample.float()(x)
-
+                x_mean, mu, log_var = self.GaussianSample.float()(x)
+                x = x_mean
             x = dense(x.float())
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
@@ -285,17 +284,24 @@ class ConvResnet(nn.Module):
         if self.is_bayesian:
             if self.final_activation is not None:
                 x = self.final_activation(x)
+            else:
+                x = x.clone()
             # TODO GaussianSample turning to float16 (half), but x is float32 (float)
             if random_node == "output":
-                y, _, _ = self.GaussianSample.float()(x)
+                x_mean, mu, log_var = self.GaussianSample.float()(x)
+                x = x_mean.clone()
         else:
             if self.final_activation is not None:
-                y = self.final_activation(x)
-        return y
+                x = self.final_activation(x)
+            else:
+                x = x.clone()
+        return x, mu, log_var, x_mean
 
     def mle_forward(self, input, random_node):
         x = self.blocks(input)
         x = x.view(-1, 256)
+        mu = None
+        log_var = None
         if self.is_bns[0]:
             x = self.bns[0](x)
         for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
@@ -303,21 +309,25 @@ class ConvResnet(nn.Module):
             if is_drop:
                 x = self.dropout[i](x)
             if random_node == "last" and i == len(self.bns)-2:
-                x, _, _ = self.GaussianSample.float()(x)
+                x, mu, log_var = self.GaussianSample.float()(x)
             x = dense(x.float())
+
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
                     x = self.bns[i + 1](x)
                 x = self.activation(x)
+        if random_node == "last":
+            if self.final_activation is not None:
+                x = self.final_activation(x)
 
         assert self.is_bayesian
         # GaussianSample turning to float16 (half), but x is float32 (float)
         # y = self.GaussianSample.float().mle(x)
         if random_node == "output":
-            y, _, _ = self.GaussianSample.float()(x)
-        if self.final_activation is not None:
-            y = self.final_activation(y)
-        return y
+            if self.final_activation is not None:
+                x = self.final_activation(x)
+            x, mu, log_var = self.GaussianSample.float()(x)
+        return x, mu, log_var
 
     def get_parameters(self):
         for name, param in self.named_parameters():
