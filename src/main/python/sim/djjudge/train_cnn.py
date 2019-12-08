@@ -1,16 +1,15 @@
+from .models.supervised.CNN_1D import Simple1DCNN, ConvResnet
+from .utils.CycleAnnealScheduler import CycleScheduler
+from torch.utils.data import DataLoader
+from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-
-from sim.djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
-from sim.djjudge.utils.CycleAnnealScheduler import CycleScheduler
-from torch.utils.data import DataLoader
-from sim.djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 from .utils.utils import create_missing_folders
-
+import math
 
 if torch.cuda.is_available():
     device = 'cuda'
@@ -145,7 +144,7 @@ def load_checkpoint_for_test(checkpoint_path, model):
 
 def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
                     stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type,
-                    is_bayesian):
+                    is_bayesian, random_node):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
     if model_type == "convresnet":
@@ -160,7 +159,8 @@ def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n
                                       activation=activation,
                                       final_activation=final_activation,
                                       drop_val=dropval,
-                                      is_bayesian=is_bayesian).to(device)
+                                      is_bayesian=is_bayesian,
+                                      random_node=random_node).to(device)
     else:
         model_for_saving = Simple1DCNN(
             activation=activation,
@@ -205,7 +205,9 @@ def train(training_folders,
           factor=2,
           flat_extrems=False,
           model_type="convresnet",
-          is_bayesian=False
+          is_bayesian=False,
+          random_node="output",
+          get_mle=False
           ):
     if noise > 0.:
         is_noisy = True
@@ -222,11 +224,14 @@ def train(training_folders,
     else:
         final_activation_string = str(final_activation).split('torch.')[0]
 
-    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
-                                                             str(init_method).split(" ")[1],
-                                                             activation_string,
-                                                             final_activation_string,
-                                                             str(is_bns), str(is_dropouts))
+    checkpoint_complete_name = "{}_{}_{}_{}_{}_{}_{}_{}_{}".format(checkpoint_name, model_type,
+                                                                   str(init_method).split(" ")[1],
+                                                                   activation_string,
+                                                                   final_activation_string,
+                                                                   str(is_bns),
+                                                                   str(is_dropouts),
+                                                                   str(dense_layers_sizes),
+                                                                   random_node)
 
     torch.manual_seed(42)
     dense_layers_sizes = [channel] + dense_layers_sizes
@@ -242,7 +247,8 @@ def train(training_folders,
                            activation=activation,
                            final_activation=final_activation,
                            drop_val=drop_val,
-                           is_bayesian=is_bayesian
+                           is_bayesian=is_bayesian,
+                           random_node=random_node
                            ).to(device)
     else:
         model = Simple1DCNN(
@@ -251,7 +257,8 @@ def train(training_folders,
             drop_val=drop_val,
             is_bns=is_bns,
             is_dropouts=is_dropouts,
-            is_bayesian=is_bayesian
+            is_bayesian=is_bayesian,
+            random_node=random_node
         )
     model.random_init(init_method=init_method)
     criterion = loss_type()
@@ -305,6 +312,8 @@ def train(training_folders,
         from apex import amp
         model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
 
+    print(model.parameters)
+
     for epoch in range(epoch_offset, epochs):
         loss_list = {
             "train": {
@@ -330,7 +339,9 @@ def train(training_folders,
             model.zero_grad()
             audio, targets, sampling_rate = batch
             audio = torch.autograd.Variable(audio).to(device)
-            outputs = model(audio.unsqueeze(1)).squeeze()
+            outputs, _, _, _ = model(audio.unsqueeze(1), random_node=random_node)
+            del _
+            outputs = outputs.squeeze()
             outputs_original = outputs.clone().detach()
             noisy = torch.rand(len(targets)).normal_() * noise
             targets += noisy
@@ -375,29 +386,29 @@ def train(training_folders,
                 if len(lt_avg) > 0:
                     # O* = O + [ ( T - O) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
                     outputs[lt_avg] = outputs[lt_avg].clone().detach() + (
-                                (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ((torch.abs(
-                            outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (
-                                                                                                                     1 - torch.abs(
-                                                                                                                 targets[
-                                                                                                                     lt_avg].clone().detach() - average_score))))  # / average_score
+                            (targets[lt_avg].clone().detach() - outputs[lt_avg].clone().detach()) - ((torch.abs(
+                        outputs[lt_avg].clone().detach() - targets[lt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                             1 - torch.abs(
+                                                                                                         targets[
+                                                                                                             lt_avg].clone().detach() - average_score))))  # / average_score
                 if len(gt_avg) > 0:
                     # O* = O - [ ( O - T) - ( ( T + ( O - T ) ^ 2 )  * ( 1 - | avg - T | ) ) ]
                     outputs[gt_avg] = outputs[gt_avg].clone().detach() - (
-                                (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ((torch.abs(
-                            outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (
-                                                                                                                     1 - torch.abs(
-                                                                                                                 targets[
-                                                                                                                     gt_avg].clone().detach() - average_score))))  # / average_score
+                            (outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()) - ((torch.abs(
+                        outputs[gt_avg].clone().detach() - targets[gt_avg].clone().detach()).log1p_() * factor) * (
+                                                                                                             1 - torch.abs(
+                                                                                                         targets[
+                                                                                                             gt_avg].clone().detach() - average_score))))  # / average_score
 
             mse_loss = criterion(outputs, targets)
             loss = mse_loss
             # logger.add_scalar('training_loss', loss.item(), i + len(train_loader) * epoch)
-            # train_abs = torch.mean(torch.abs_(outputs - targets.to(device)))
+            train_abs = torch.mean(torch.abs_(outputs - targets.to(device)))
             loss_list["train"]["outputs_list"].extend(outputs_original.detach().cpu().numpy())
             loss_list["train"]["outputs_list2"].extend(outputs.detach().cpu().numpy())
             loss_list["train"]["targets_list"].extend(targets.detach().cpu().numpy())
             loss_list["train"]["mse"] += [mse_loss.item()]
-            loss_list["train"]["abs_error"] += [mse_loss.item()]
+            loss_list["train"]["abs_error"] += [train_abs.item()]
             if fp16_run:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
@@ -425,9 +436,10 @@ def train(training_folders,
         model.eval()
         for i, batch in enumerate(valid_loader):
             audios, targets, sampling_rate = batch
-            audios = torch.stack([audio.to(device) for audio in audios]).view(3, -1, 300000)
+            audios = torch.stack([audio.to(device) for audio in audios])  # .view(batch_size, -1, 300000)
 
-            outputs = [model(audio.unsqueeze(1)).squeeze() for audio in audios]
+            outputs = [model(audio.unsqueeze(1), random_node=random_node) for audio in audios]
+            outputs = [output[0].squeeze() for output in outputs]
 
             mse_losses = torch.stack([criterion(out, targets.to(device)) for out in outputs])
             mse_loss = torch.min(mse_losses)
@@ -439,14 +451,16 @@ def train(training_folders,
             loss_list["valid"]["valid_abs_all"].extend(abs.detach().cpu().numpy())
 
             del mse_loss, mse_losses, outputs, argmin, abs  # , energy_loss
-
-            outputs_mle = [model.mle_forward(audio.unsqueeze(1)).squeeze() for audio in audios]
-            mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
-            mse_loss_mle = torch.min(mse_losses_mle)
-            argmin_mle = int(torch.argmin(mse_losses_mle))
-            loss_list["valid"]["outputs_list_mle"].extend(outputs_mle[argmin_mle].detach().cpu().numpy())
-            loss_list["valid"]["mse_loss_mle"] += [mse_loss_mle.item()]
-            del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
+            if get_mle:
+                outputs_mle = [model.mle_forward(audio.unsqueeze(1), random_node=random_node) for audio in
+                               audios]
+                outputs_mle = [output[0].squeeze() for output in outputs_mle]
+                mse_losses_mle = torch.stack([criterion(out, targets.to(device)) for out in outputs_mle])
+                mse_loss_mle = torch.min(mse_losses_mle)
+                argmin_mle = int(torch.argmin(mse_losses_mle))
+                loss_list["valid"]["outputs_list_mle"].extend(outputs_mle[argmin_mle].detach().cpu().numpy())
+                loss_list["valid"]["mse_loss_mle"] += [mse_loss_mle.item()]
+                del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["mse_loss_mle"] += [float(np.mean(loss_list["valid"]["mse_loss_mle"]))]
         boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
@@ -455,7 +469,7 @@ def train(training_folders,
         if epoch % epochs_per_checkpoint == 0:
             save_checkpoint(model, optimizer, learning_rate, epoch, checkpoint_complete_name, channel, n_res_block,
                             n_res_channel, stride, dense_layers_sizes, is_bns, is_dropouts, activation,
-                            final_activation, drop_val, model_type, is_bayesian)
+                            final_activation, drop_val, model_type, is_bayesian, random_node)
             print("Epoch: {}:\tValid Loss: {:.3f}, Energy loss: {:.3f}".format(epoch,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["mse_loss_mle"][-1]))
@@ -467,38 +481,38 @@ def train(training_folders,
         performance_per_score(loss_list["valid"]["outputs_list"], loss_list["valid"]["targets_list"],
                               results_path="figures",
                               filename="scores_performance_valid.png", n=20, valid=True)
-        performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
-                              results_path="figures",
-                              filename="scores_performance_valid_mle.png", n=20, valid=True)
+        if get_mle:
+            performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
+                                  results_path="figures",
+                                  filename="scores_performance_valid_mle.png", n=20, valid=True)
         del loss_list
 
 
 """
-appctx = ApplicationContext()
-    training_folders = [
-        appctx.get_resource("MIR/genres/blues/wav"),
-        appctx.get_resource("MIR/genres/classical/wav"),
-        appctx.get_resource("MIR/genres/country/wav"),
-        appctx.get_resource("MIR/genres/disco/wav"),
-        appctx.get_resource("MIR/genres/hiphop/wav"),
-        appctx.get_resource("MIR/genres/jazz/wav"),
-        appctx.get_resource("MIR/genres/metal/wav"),
-        appctx.get_resource("MIR/genres/pop/wav"),
-        appctx.get_resource("MIR/genres/reggae/wav"),
-        appctx.get_resource("MIR/genres/rock/wav")
-    ]
-    scores = [
-        appctx.get_resource("MIR/genres/blues/scores.csv"),
-        appctx.get_resource("MIR/genres/classical/scores.csv"),
-        appctx.get_resource("MIR/genres/country/scores.csv"),
-        appctx.get_resource("MIR/genres/disco/scores.csv"),
-        appctx.get_resource("MIR/genres/hiphop/scores.csv"),
-        appctx.get_resource("MIR/genres/jazz/scores.csv"),
-        appctx.get_resource("MIR/genres/metal/scores.csv"),
-        appctx.get_resource("MIR/genres/pop/scores.csv"),
-        appctx.get_resource("MIR/genres/reggae/scores.csv"),
-        appctx.get_resource("MIR/genres/rock/scores.csv")
-    ]
+training_folders = [
+    "C:/Users/simon/Documents/MIR/genres/blues/wav",
+    "C:/Users/simon/Documents/MIR/genres/classical/wav",
+    "C:/Users/simon/Documents/MIR/genres/country/wav",
+    "C:/Users/simon/Documents/MIR/genres/disco/wav",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
+    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
+    "C:/Users/simon/Documents/MIR/genres/metal/wav",
+    "C:/Users/simon/Documents/MIR/genres/pop/wav",
+    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
+    "C:/Users/simon/Documents/MIR/genres/rock/wav",
+]
+scores = [
+    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
+    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
+]
 output_directory = "C:/Users/simon/djjudge/"
 
 if __name__ == "__main__":

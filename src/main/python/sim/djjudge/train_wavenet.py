@@ -1,19 +1,17 @@
 import torch
-
-from sim.djjudge.models.unsupervised.wavenet.wavenet import *
-from sim.djjudge.data_preparation.audio_data import WavenetDataset
-from sim.djjudge.utils.wavenet_training import *
-from sim.djjudge.utils.model_logging import *
-
+import tensorflow as tf
+from .data_preparation.audio_data import WavenetDataset
+from .models.unsupervised.wavenet.wavenet_training import WavenetTrainer, generate_audio
+from .models.unsupervised.wavenet.model_logging import TensorboardLogger
+from .models.unsupervised.wavenet.wavenet import WaveNetEncoder, load_latest_model_from
+# from .models.unsupervised.wavenet.wavenet import *
 
 dtype = torch.FloatTensor
 ltype = torch.LongTensor
-
-
 def load_checkpoint(checkpoint_path, model, name="wavenet"):
     # if checkpoint_path
     checkpoint_dict = torch.load(checkpoint_path + name, map_location='cpu')
-#    epoch = checkpoint_dict['epoch']
+    # epoch = checkpoint_dict['epoch']
     model_for_loading = checkpoint_dict
     model.load_state_dict(model_for_loading.state_dict())
     print("Loaded checkpoint '{}'".format(checkpoint_path))

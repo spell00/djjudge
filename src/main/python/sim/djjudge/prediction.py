@@ -1,12 +1,11 @@
+from .models.supervised.CNN_1D import Simple1DCNN, ConvResnet
+from torch.utils.data import DataLoader
+from .data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-
-from sim.djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
-from torch.utils.data import DataLoader
-from sim.djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 from .utils.utils import create_missing_folders
 
 if torch.cuda.is_available():
@@ -196,7 +195,7 @@ def predict(predict_folders,
         model.zero_grad()
         audio, _, sampling_rate = batch
         audio = torch.autograd.Variable(audio).to(device)
-        preds = model(audio.unsqueeze(1)).squeeze()
+        preds, mu, log_var, x = model(audio.unsqueeze(1)).squeeze()
         predictions += [preds.detach().cpu().numpy()]
         loss_list["predict"]["outputs_list"] += [predictions[-1]]
 

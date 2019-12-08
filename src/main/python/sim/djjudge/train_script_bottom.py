@@ -1,15 +1,7 @@
-import torch
-import tensorflow as tf
-
-from sim.djjudje.models.unsupervised.wavenet.wavenet import *
-from sim.djjudje.data_preparation.audio_data import WavenetDataset
-from sim.djjudje.models.unsupervised.wavenet.wavenet_training import WavenetTrainer
-from sim.djjudje.utils.wavenet_training import *
-from sim.djjudje.utils.model_logging import *
-from sim.djjudge.models.unsupervised.wavenet.wavenet import WaveNetEncoder, load_latest_model_from
-from sim.djjudge.utils.model_logging import TensorboardLogger
-
-# TODO import def generate_audio(
+from .models.unsupervised.wavenet.wavenet import *
+from .data_preparation.audio_data import WavenetDataset
+# from .utils.wavenet_training import *
+from djjudge.models.unsupervised.wavenet.model_logging import *
 
 dtype = torch.FloatTensor
 ltype = torch.LongTensor

@@ -18,8 +18,8 @@ class Stochastic(nn.Module):
     parametrised by mu and log_var.
     """
 
-    def reparametrize(self, beta, log_var, x):
-        epsilon = Variable(torch.randn(beta.size()), requires_grad=False)
+    def reparametrize(self, mu, log_var):
+        epsilon = Variable(torch.randn(mu.size()), requires_grad=False)
 
         epsilon = epsilon.to(device)
 
@@ -28,9 +28,9 @@ class Stochastic(nn.Module):
         std = log_var.mul(0.5).exp_()
 
         # y = x.T * beta + std * epsilon
-
-        y = (x * beta).addcmul(std, epsilon)
-        assert y.shape[1] == 1
+        # mu is x.T * beta
+        # y = mu _ std * epsilon
+        y = (mu).addcmul(std, epsilon)
         return y
 
 
@@ -44,17 +44,17 @@ class GaussianSample(Stochastic):
         super(GaussianSample, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.beta = nn.Linear(in_features, out_features).to(device)
+        self.mu = nn.Linear(in_features, out_features).to(device)
         self.log_var = nn.Linear(in_features, out_features).to(device)
 
     def forward(self, x):
-        beta = self.beta(x)
+        mu = self.mu(x)
         log_var = F.softplus(self.log_var(x))
 
-        return self.reparametrize(beta, log_var, x), beta, log_var
+        return self.reparametrize(mu, log_var), mu, log_var
 
     def mle(self, x):
-        return self.beta(x)
+        return self.mu(x)
 
 
 class Simple1DCNN(torch.nn.Module):
@@ -64,10 +64,15 @@ class Simple1DCNN(torch.nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
-                 is_bayesian=False
+                 is_bayesian=False,
+                 random_node="output"
                  ):
         super(Simple1DCNN, self).__init__()
-        self.GaussianSample = GaussianSample(1, 1)
+        if is_bayesian:
+            if random_node == "output":
+                self.GaussianSample = GaussianSample(1, 1)
+            elif(random_node == "last"):
+                self.GaussianSample = GaussianSample(1233, 1233)
         self.is_bayesian = is_bayesian
 
         self.activation = activation.to(device)
@@ -166,12 +171,16 @@ class ConvResnet(nn.Module):
                  is_dropouts,
                  final_activation=None,
                  drop_val=0.5,
-                 is_bayesian=False
+                 is_bayesian=False,
+                 random_node="output"
                  ):
         super().__init__()
         self.is_bayesian = is_bayesian
         if is_bayesian:
-            self.GaussianSample = GaussianSample(1, 1)
+            if random_node == "output":
+                self.GaussianSample = GaussianSample(1, 1)
+            elif(random_node == "last"):
+                self.GaussianSample = GaussianSample(dense_layers_sizes[-2], dense_layers_sizes[-2])
         if stride == 4:
             blocks = [
                 nn.Conv1d(in_channel, channel // 2, 4, stride=2, padding=1),
@@ -253,7 +262,7 @@ class ConvResnet(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def forward(self, input):
+    def forward(self, input, random_node):
         x = self.blocks(input)
         x = x.view(-1, 256)
         if self.is_bns[0]:
@@ -263,6 +272,9 @@ class ConvResnet(nn.Module):
             if is_drop:
                 x = self.dropout[i](x)
             # TODO linear layers are not turning to float16
+            if random_node == "last" and i == len(self.bns)-2:
+                x_mean, mu, log_var = self.GaussianSample.float()(x)
+                x = x_mean
             x = dense(x.float())
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
@@ -272,32 +284,50 @@ class ConvResnet(nn.Module):
         if self.is_bayesian:
             if self.final_activation is not None:
                 x = self.final_activation(x)
+            else:
+                x = x.clone()
             # TODO GaussianSample turning to float16 (half), but x is float32 (float)
-            x, _, _ = self.GaussianSample.float()(x)
+            if random_node == "output":
+                x_mean, mu, log_var = self.GaussianSample.float()(x)
+                x = x_mean.clone()
         else:
             if self.final_activation is not None:
                 x = self.final_activation(x)
-        return x
+            else:
+                x = x.clone()
+        return x, mu, log_var, x_mean
 
-    def mle_forward(self, input):
+    def mle_forward(self, input, random_node):
         x = self.blocks(input)
         x = x.view(-1, 256)
+        mu = None
+        log_var = None
         if self.is_bns[0]:
             x = self.bns[0](x)
         for i, (dense, bn, is_bn, is_drop) in enumerate(zip(self.linears, self.bns, self.is_bns, self.is_dropouts)):
-            # TODO linear layers are not turning to float16
+            # linear layers are not turning to float16
+            if is_drop:
+                x = self.dropout[i](x)
+            if random_node == "last" and i == len(self.bns)-2:
+                x, mu, log_var = self.GaussianSample.float()(x)
             x = dense(x.float())
+
             if i < len(self.bns)-2:
                 if self.is_bns[i + 1]:
                     x = self.bns[i + 1](x)
                 x = self.activation(x)
+        if random_node == "last":
+            if self.final_activation is not None:
+                x = self.final_activation(x)
 
         assert self.is_bayesian
-        # TODO GaussianSample turning to float16 (half), but x is float32 (float)
-        x = self.GaussianSample.float().mle(x)
-        if self.final_activation is not None:
-            x = self.final_activation(x)
-        return x
+        # GaussianSample turning to float16 (half), but x is float32 (float)
+        # y = self.GaussianSample.float().mle(x)
+        if random_node == "output":
+            if self.final_activation is not None:
+                x = self.final_activation(x)
+            x, mu, log_var = self.GaussianSample.float()(x)
+        return x, mu, log_var
 
     def get_parameters(self):
         for name, param in self.named_parameters():

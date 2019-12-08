@@ -20,5 +20,4 @@ if __name__ == "__main__":
             fp16_run=False,
             final_activation=torch.nn.Hardtanh(min_val=-0.4, max_val=1.4),
             activation=torch.nn.PReLU(),
-            checkpoint_name="classif_ckpt/cnn_corr_convresnet_kaiming_uniform__PReLU(num_parameters=1)_Hardtanh(min_val=-1.4, max_val=1.4)_[0, 0]_[1, 1]",
-)
+            checkpoint_name="classif_ckpt/cnn_corr_convresnet_kaiming_uniform__PReLU(num_parameters=1)_Hardtanh(min_val=-1.4, max_val=1.4)_[0, 0]_[1, 1]")

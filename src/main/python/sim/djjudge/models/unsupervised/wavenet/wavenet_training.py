@@ -5,8 +5,8 @@ import time
 from datetime import datetime
 import torch.nn.functional as F
 from torch.autograd import Variable
-from model_logging import Logger
-from wavenet_modules import *
+from .model_logging import Logger
+from .wavenet_modules import *
 
 
 def print_last_loss(opt):
