@@ -304,6 +304,7 @@ def train(training_folders,
         from apex import amp
         model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
 
+    print(model.parameters)
 
     for epoch in range(epoch_offset, epochs):
         loss_list = {
