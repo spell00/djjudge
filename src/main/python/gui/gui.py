@@ -5,6 +5,8 @@ from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QWidget, QMainWindow, QPushButton, QHBoxLayout, QVBoxLayout, QSlider, QLabel, \
     QTreeWidget, QTreeWidgetItem, QAction, QFileDialog
+
+from gui.djjudge import Djjudge
 from jim import constants, musicfunctions
 from gui import generationOption, Rating, details
 
@@ -28,6 +30,7 @@ class App(QMainWindow):
         self.mediaplayer = self.instance.media_player_new()
         self.title = 'Open Deep Jockey'
         self.generateOption = generationOption.GenerationOption(self.ctx)
+        self.djjudgeWindows = Djjudge(self.ctx)
         self.width = 1024
         self.height = 512
         self.left = 256
@@ -261,7 +264,7 @@ class App(QMainWindow):
         djjudgeAction.setShortcut("Ctrl+D")
         djjudgeAction.setStatusTip('DjJudge')
         # connect to function
-        djjudgeAction.triggered.connect(details.on_djjudge)
+        djjudgeAction.triggered.connect(self.on_djjudge)
         # Add Actions to menu
         genMenu = menubar.addMenu('DjJudge')
         genMenu.addAction(djjudgeAction)
@@ -298,3 +301,8 @@ class App(QMainWindow):
         self.generateOption.resize(1024, 512)
         self.generateOption.show()
         print("on_option")
+
+    def on_djjudge(self):
+        self.djjudgeWindow.resize(1024, 512)
+        self.djjudgeWindow.show()
+        print("on_djjudge")

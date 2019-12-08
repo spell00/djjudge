@@ -35,17 +35,6 @@ def on_load():
     print("on_load")
 
 
-def on_option():
-    ctx = ApplicationContext()       # 1. Instantiate ApplicationContext
-    option = generationOption.GenerationOption(ctx)
-    option.show()
-    print("on_option")
-
-
-def on_djjudge():
-    print("on_djjudge")
-
-
 def folderIterator(self):
     folderChosen = QFileDialog.getOpenFileName(None, 'Open Music Folder', '~', 'All Files(*.*)')
     if folderChosen != None:
