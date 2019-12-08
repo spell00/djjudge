@@ -1,36 +1,32 @@
 import torch
-
-from sim.djjudge.train_cnn import train
-from torch import nn
 # from djjudge.models.supervised.CNN_1D import *
-from fbs_runtime.application_context.PyQt5 import ApplicationContext
+from djjudge.train_cnn import train
+from torch import nn
+if __name__ == "__main__":
 
-
-def main(ctx):
-    appctx = ctx
     training_folders = [
-        appctx.get_resource("MIR/genres/blues/wav"),
-        appctx.get_resource("MIR/genres/classical/wav"),
-        appctx.get_resource("MIR/genres/country/wav"),
-        appctx.get_resource("MIR/genres/disco/wav"),
-        appctx.get_resource("MIR/genres/hiphop/wav"),
-        appctx.get_resource("MIR/genres/jazz/wav"),
-        appctx.get_resource("MIR/genres/metal/wav"),
-        appctx.get_resource("MIR/genres/pop/wav"),
-        appctx.get_resource("MIR/genres/reggae/wav"),
-        appctx.get_resource("MIR/genres/rock/wav")
+        "/home/simon/Desktop/MIR/genres/blues/wav",
+        "/home/simon/Desktop/MIR/genres/classical/wav",
+        "/home/simon/Desktop/MIR/genres/country/wav",
+        "/home/simon/Desktop/MIR/genres/disco/wav",
+        "/home/simon/Desktop/MIR/genres/hiphop/wav",
+        "/home/simon/Desktop/MIR/genres/jazz/wav",
+        "/home/simon/Desktop/MIR/genres/metal/wav",
+        "/home/simon/Desktop/MIR/genres/pop/wav",
+        "/home/simon/Desktop/MIR/genres/reggae/wav",
+        "/home/simon/Desktop/MIR/genres/rock/wav",
     ]
     scores = [
-        appctx.get_resource("MIR/genres/blues/scores.csv"),
-        appctx.get_resource("MIR/genres/classical/scores.csv"),
-        appctx.get_resource("MIR/genres/country/scores.csv"),
-        appctx.get_resource("MIR/genres/disco/scores.csv"),
-        appctx.get_resource("MIR/genres/hiphop/scores.csv"),
-        appctx.get_resource("MIR/genres/jazz/scores.csv"),
-        appctx.get_resource("MIR/genres/metal/scores.csv"),
-        appctx.get_resource("MIR/genres/pop/scores.csv"),
-        appctx.get_resource("MIR/genres/reggae/scores.csv"),
-        appctx.get_resource("MIR/genres/rock/scores.csv")
+        "/home/simon/Desktop/MIR/genres/blues/scores.csv",
+        "/home/simon/Desktop/MIR/genres/classical/scores.csv",
+        "/home/simon/Desktop/MIR/genres/country/scores.csv",
+        "/home/simon/Desktop/MIR/genres/disco/scores.csv",
+        "/home/simon/Desktop/MIR/genres/hiphop/scores.csv",
+        "/home/simon/Desktop/MIR/genres/jazz/scores.csv",
+        "/home/simon/Desktop/MIR/genres/metal/scores.csv",
+        "/home/simon/Desktop/MIR/genres/pop/scores.csv",
+        "/home/simon/Desktop/MIR/genres/reggae/scores.csv",
+        "/home/simon/Desktop/MIR/genres/rock/scores.csv",
     ]
     output_directory = "."
 
@@ -41,14 +37,15 @@ def main(ctx):
     train(training_folders,
           scores,
           output_directory,
-          batch_size=6,
+          batch_size=4,
           epochs=1000,
           epochs_per_checkpoint=1,
-          learning_rate=1e-3,
+          learning_rate=3e-4,
           fp16_run=False,
-          checkpoint_name="classif_ckpt/cnn_corr_bayesian_v2",
+          checkpoint_name="classif_ckpt/cnn_corr_bayesian_v3",
           is_bns=[1, 1],
           is_dropouts=[1, 1],
+          dense_layers_sizes=[128, 1],
           activation=nn.PReLU(),
           final_activation=None,
           noise=0.02,
@@ -57,11 +54,7 @@ def main(ctx):
           flat_extrems=False,
           model_type="convresnet",
           is_bayesian=True,
-          init_method=nn.init.kaiming_normal_,
-
+          init_method=nn.init.kaiming_uniform_,
+          random_node="last",
+          get_mle=True
           )
-
-
-# DONT EXEC FROM HERE, exec from main !
-if __name__ == "__main__":
-    main(ApplicationContext())
