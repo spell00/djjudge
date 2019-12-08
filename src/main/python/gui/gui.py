@@ -63,11 +63,14 @@ class App(QMainWindow):
         QTreeWidgetItem(self.tree, [self.ctx.get_resource('midis/Holiday.mid'), '4', 'Example'])
         # create Tune buttun
         self.tuneBtn = QPushButton('Tune')  # Tune button
+        self.generateBtn = QPushButton('Nothing to tune')  # generation button
         # Add elements to list zone
         listArea.addWidget(self.tree)
         listArea.addWidget(self.tuneBtn)
+        listArea.addWidget(self.generateBtn)
         # Connect each signal to their appropriate function
         self.tuneBtn.clicked.connect(self.TuneHandler)
+        self.generateBtn.clicked.connect(self.GenerateHandler)
 
         # Create player img widget
         imgPlayer = QLabel(self)
@@ -126,6 +129,35 @@ class App(QMainWindow):
         self.statusBar()
         # self.playlist.currentMediaChanged.connect(self.songChanged)
 
+    def GenerateHandler(self):
+        # Generate buttun pushed
+        print("GenerateHandler")
+        if len(self.tune) == 0:
+                self.statusBar().showMessage("No item to tune")
+        elif len(self.tune) == 1:
+            # "Tuning 1 file"
+            # TODO modulation
+            self.tune.append(self.tree.currentItem().data(0, 0))
+            musicfunctions.generateSongFromOneSong(self.tune[0])
+            QTreeWidgetItem(self.tree, [constants.PATH_GENERATED_SONG, '', "pending"])
+            self.tree.clearSelection()
+            self.tune = []
+            self.generateBtn.setText("No item to tune")
+            self.cleanTree()
+        elif len(self.tune) == 2:
+            # "Tuning 2 files"
+            # TODO modulation
+            print("Tune selection" + str(self.tune))
+            musicfunctions.generateSongFromTwoSongs([self.tune[0], self.tune[1]])
+            QTreeWidgetItem(self.tree, [constants.PATH_GENERATED_SONG, '', "pending"])
+            self.tree.clearSelection()
+            self.tune = []
+            self.generateBtn.setText("No item to tune")
+            self.cleanTree()
+        else:
+            print("TuneHandler error")
+
+
     def TuneHandler(self):
         # Tune buttun pushed
         print("TuneHandler")
@@ -135,8 +167,9 @@ class App(QMainWindow):
                 self.tune.append(self.tree.currentItem().data(0, 0))
                 self.tree.currentItem().setData(2, 0, "To Tune")
                 self.tree.clearSelection()
+                self.generateBtn.setText("Generate")
             else:
-                self.statusBar().showMessage("No item to tune")
+                self.statusBar().showMessage("No item to tune selected")
         elif len(self.tune) == 1:
             if self.tree.selectedItems():
                 # select second file
@@ -144,13 +177,7 @@ class App(QMainWindow):
                 self.tree.currentItem().setData(2, 0, "To Tune")
                 self.tree.clearSelection()
             else:
-                # "Tuning 1 file"
-                # TODO modulation
-                self.tune.append(self.tree.currentItem().data(0, 0))
-                musicfunctions.generateSongFromOneSong(self.tune[0])
-                QTreeWidgetItem(self.tree, [constants.PATH_GENERATED_SONG, '', "Generated"])
-                self.tree.clearSelection()
-                self.tune = []
+                self.statusBar().showMessage("No item to tune selected")
         elif len(self.tune) == 2:
             if self.tree.selectedItems():
                 # Remove first, append new one
@@ -158,14 +185,9 @@ class App(QMainWindow):
                 self.tune[1] = self.tree.selectedItems()[0].data(0, 0)
                 self.tree.currentItem().setData(2, 0, "To Tune")
                 self.tree.clearSelection()
+                self.generateBtn.setText("Generate")
             else:
-                # "Tuning 2 files"
-                # TODO modulation
-                print("Tune selection" + str(self.tune))
-                musicfunctions.generateSongFromTwoSongs([self.tune[0], self.tune[1]])
-                QTreeWidgetItem(self.tree, [constants.PATH_GENERATED_SONG, '', "Generated"])
-                self.tree.clearSelection()
-                self.tune = []
+                self.statusBar().showMessage("No item to tune selected")
         else:
             print("TuneHandler error")
 
@@ -232,7 +254,7 @@ class App(QMainWindow):
                 # self.playlist = []
                 print("playlist not empty")
             # self.playlist.append(Media.Media(song[0]))
-            QTreeWidgetItem(self.tree, [song[0], '', "Pending"])
+            QTreeWidgetItem(self.tree, [song[0], '', "pending"])
             self.statusBar().showMessage(str(song[0])+" loaded")
             self.actionBtn.setText("Play")
             self.clearBtn.setText("Clear")
@@ -244,3 +266,9 @@ class App(QMainWindow):
             self.tree.currentItem().setData(1, 0, value + 1)  # TODO manage when no item
         else:
             self.statusBar().showMessage("no media selected")
+
+    def cleanTree(self):
+        print("cleaning")
+        for i in range(self.tree.topLevelItemCount()):
+            self.tree.topLevelItem(i).setData(2, 0, "pending")
+            print(self.tree.topLevelItem(i))
