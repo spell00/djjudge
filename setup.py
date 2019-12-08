@@ -24,6 +24,6 @@ setup(name="djjudge", version="0.2",
                         'tensorboardX',
                         'Unidecode',
                         'magenta',
-                        'apex'
+                        # 'apex'
                         ]
       )
