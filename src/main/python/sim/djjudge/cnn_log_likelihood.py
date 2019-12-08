@@ -10,7 +10,7 @@ import pandas as pd
 from djjudge.utils.utils import create_missing_folders
 
 spotify = ["/home/simon/Desktop/spotify/potpourri"]
-checkpoint_path="classif_ckpt/cnn_corr_bayesian_v3_convresnet_kaiming_uniform__PReLU(num_parameters=1)_None_[1, 1]_[1, 1]_[32, 1]_last"
+checkpoint_path="classif_ckpt/cnn_corr_bayesian_v3_convresnet_kaiming_uniform__PReLU(num_parameters=1)_None_[1, 1]_[1, 1]_[128, 1]_last"
 def performance_per_score(predicted_values, results_path, filename="scores_performance"):
     create_missing_folders(results_path + "/plots/")
     fig2, ax21 = plt.subplots()
