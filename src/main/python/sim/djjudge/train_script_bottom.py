@@ -1,7 +1,7 @@
-from .models.unsupervised.wavenet.wavenet import *
-from .data_preparation.audio_data import WavenetDataset
+from sim.djjudge.models.unsupervised.wavenet.wavenet import *
+from sim.djjudge.data_preparation.audio_data import WavenetDataset
 # from .utils.wavenet_training import *
-from djjudge.models.unsupervised.wavenet.model_logging import *
+from sim.djjudge.models.unsupervised.wavenet.model_logging import *
 
 dtype = torch.FloatTensor
 ltype = torch.LongTensor

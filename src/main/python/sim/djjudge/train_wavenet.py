@@ -8,6 +8,8 @@ from .models.unsupervised.wavenet.wavenet import WaveNetEncoder, load_latest_mod
 
 dtype = torch.FloatTensor
 ltype = torch.LongTensor
+
+
 def load_checkpoint(checkpoint_path, model, name="wavenet"):
     # if checkpoint_path
     checkpoint_dict = torch.load(checkpoint_path + name, map_location='cpu')

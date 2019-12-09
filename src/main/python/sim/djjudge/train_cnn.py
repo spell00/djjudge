@@ -10,11 +10,15 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 from .utils.utils import create_missing_folders
 import math
+from fbs_runtime.application_context.PyQt5 import ApplicationContext
+
 
 if torch.cuda.is_available():
     device = 'cuda'
 else:
     device = "cpu"
+
+ctx = ApplicationContext()
 
 
 def rand_jitter(arr):
@@ -275,13 +279,13 @@ def train(training_folders,
         epoch += 1  # next epoch is epoch + 1
 
     all_set = Wave2tensor(training_folders, scores, segment_length=300000, all=True, valid=False)
-    boxplots_genres(all_set.scores, results_path="figures")
+    boxplots_genres(all_set.scores, results_path=ctx.get_resource("figures"))
     del all_set
     train_set = Wave2tensor(training_folders, scores, segment_length=300000)
 
     valid_set = Wave2tensor(training_folders, scores, segment_length=300000, valid=True)
 
-    plot_data_distribution(train_set.scores, valid_set.scores, results_path="figures")
+    plot_data_distribution(train_set.scores, valid_set.scores, results_path=ctx.get_resource("figures"))
     train_loader = DataLoader(train_set, num_workers=0,
                               shuffle=True,
                               batch_size=batch_size,
@@ -422,10 +426,10 @@ def train(training_folders,
         losses["train"]["abs_error"] += [float(np.mean(loss_list["train"]["abs_error"]))]
 
         performance_per_score(loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"],
-                              results_path="figures",
+                              results_path=ctx.get_resource("figures"),
                               filename="scores_performance_train.png", n=80, noise=is_noisy)
         performance_per_score(loss_list["train"]["outputs_list2"], loss_list["train"]["targets_list"],
-                              results_path="figures",
+                              results_path=ctx.get_resource("figures"),
                               filename="scores_performance_train_corrected.png", n=80, noise=is_noisy)
         del loss_list["train"]["outputs_list"], loss_list["train"]["targets_list"]
         if epoch % epochs_per_checkpoint == 0:
@@ -463,7 +467,7 @@ def train(training_folders,
                 del mse_loss_mle, mse_losses_mle, audios, outputs_mle, targets, argmin_mle  # , energy_loss
         losses["valid"]["mse"] += [float(np.mean(loss_list["valid"]["mse"]))]
         losses["valid"]["mse_loss_mle"] += [float(np.mean(loss_list["valid"]["mse_loss_mle"]))]
-        boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path="figures",
+        boxplots_genres(loss_list["valid"]["valid_abs_all"], results_path=ctx.get_resource("figures"),
                         filename="boxplot_valid_performance_per_genre_valid.png", offset=20)
 
         if epoch % epochs_per_checkpoint == 0:
@@ -474,16 +478,16 @@ def train(training_folders,
                                                                                losses["valid"]["mse"][-1],
                                                                                losses["valid"]["mse_loss_mle"][-1]))
 
-        plot_performance(losses["train"]["mse"], losses["valid"]["mse"], results_path="figures",
+        plot_performance(losses["train"]["mse"], losses["valid"]["mse"], results_path=ctx.get_resource("figures"),
                          filename="training_MSEloss_trace_classification")
-        # plot_performance(losses["train"]["mse_loss_mle"], losses["valid"]["mse_loss_mle"], results_path="figures",
+        # plot_performance(losses["train"]["mse_loss_mle"], losses["valid"]["mse_loss_mle"], results_path=ctx.get_resource("figures"),
         #                  filename="training_mean_abs_diff_trace_classification")
         performance_per_score(loss_list["valid"]["outputs_list"], loss_list["valid"]["targets_list"],
-                              results_path="figures",
+                              results_path=ctx.get_resource("figures"),
                               filename="scores_performance_valid.png", n=20, valid=True)
         if get_mle:
             performance_per_score(loss_list["valid"]["outputs_list_mle"], loss_list["valid"]["targets_list"],
-                                  results_path="figures",
+                                  results_path=ctx.get_resource("figures"),
                                   filename="scores_performance_valid_mle.png", n=20, valid=True)
         del loss_list
 
@@ -527,6 +531,6 @@ if __name__ == "__main__":
           epochs_per_checkpoint=1,
           learning_rate=1e-3,
           fp16_run=True,
-          checkpoint_path="classif_ckpt/cnn_corr_normal_init")
+          checkpoint_path=ctx.get_resource("classif_ckpt/cnn_corr_normal_init"))
 
 """
