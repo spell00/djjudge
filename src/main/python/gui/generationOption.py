@@ -10,6 +10,9 @@ class GenerationOption(QMainWindow):
         super().__init__()
         self.ctx = ctx
         print("GenerationOption")
+        self.initUI()
+
+    def initUI(self):
         self.title = 'GenerationOption'
         self.width = 1024
         self.height = 512
@@ -95,8 +98,6 @@ class GenerationOption(QMainWindow):
         self.lb_min_MELODY = QLabel("min : "+str(constants.VOLUME_MELODY_MIN))
         self.melodyArea.addWidget(self.lb_min_MELODY)
 
-        print("sliderMELODY")
-
     def sliderDRUMS(self):
         self.lb_DRUMS = QLabel("VOLUME_DRUMS")
         self.drumsArea.addWidget(self.lb_DRUMS)
@@ -115,8 +116,6 @@ class GenerationOption(QMainWindow):
 
         self.lb_min_DRUMS = QLabel("min : "+str(constants.VOLUME_DRUMS_MIN))
         self.drumsArea.addWidget(self.lb_min_DRUMS)
-
-        print("sliderDRUMS")
 
     def sliderACCOMPANIMENT(self):
         self.lb_ACCOMPANIMENT = QLabel("VOLUME_ACCOMPANIMENT")
@@ -137,8 +136,6 @@ class GenerationOption(QMainWindow):
         self.lb_min_ACCOMPANIMENT = QLabel("min : "+str(constants.VOLUME_ACCOMPANIMENT_MIN))
         self.accompanimentArea.addWidget(self.lb_min_ACCOMPANIMENT)
 
-        print("sliderACCOMPANIMENT")
-
     def sliderDIFFICULTY(self):
         self.lb_DIFFICULTY = QLabel("DIFFICULTY_LVL")
         self.difficultyArea.addWidget(self.lb_DIFFICULTY)
@@ -157,8 +154,6 @@ class GenerationOption(QMainWindow):
 
         self.lb_min_DIFFICULTY = QLabel("min : "+str(constants.DIFFICULTY_LVL_MIN))
         self.difficultyArea.addWidget(self.lb_min_DIFFICULTY)
-
-        print("sliderDIFFICULTY")
 
     def valueMELODYchange(self):
         constants.VOLUME_MELODY = self.sl_MELODY.value()

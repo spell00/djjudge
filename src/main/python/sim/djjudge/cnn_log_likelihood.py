@@ -110,9 +110,10 @@ def main(ctx):
 
     performance_per_score(torch.Tensor(log_likelihoods).view(-1).sort()[0].detach().cpu(), results_path=ctx.get_resource('figures'), filename="all_nll_performance_predicted.png")
 
+    return 12
+
     # TODO put GUI here!
     # TODO inputs:
-
 
 if __name__ == "__main__":
     main(ApplicationContext())

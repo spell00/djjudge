@@ -5,10 +5,8 @@ from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QWidget, QMainWindow, QPushButton, QHBoxLayout, QVBoxLayout, QSlider, QLabel, \
     QTreeWidget, QTreeWidgetItem, QAction, QFileDialog
-
-from gui.djjudge import Djjudge
 from jim import constants, musicfunctions
-from gui import generationOption, Rating, details
+from gui import generationOption, Rating, details, djjudge
 
 
 class App(QMainWindow):
@@ -30,7 +28,7 @@ class App(QMainWindow):
         self.mediaplayer = self.instance.media_player_new()
         self.title = 'Open Deep Jockey'
         self.generateOption = generationOption.GenerationOption(self.ctx)
-        self.djjudgeWindows = Djjudge(self.ctx)
+        self.djjudgeWindow = djjudge.Djjudge(self.ctx)
         self.width = 1024
         self.height = 512
         self.left = 256
@@ -253,7 +251,7 @@ class App(QMainWindow):
         optionAction.setShortcut("Ctrl+O")
         optionAction.setStatusTip('Setup generation options')
         # connect to function
-        optionAction.triggered.connect(self.on_option)
+        optionAction.triggered.connect(self.on_generateOption)
         # Add Actions to menu
         genMenu = menubar.addMenu('Generation options')
         genMenu.addAction(optionAction)
@@ -297,7 +295,7 @@ class App(QMainWindow):
             self.tree.topLevelItem(i).setData(2, 0, "pending")
             print(self.tree.topLevelItem(i))
 
-    def on_option(self):
+    def on_generateOption(self):
         self.generateOption.resize(1024, 512)
         self.generateOption.show()
         print("on_option")

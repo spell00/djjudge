@@ -3,3 +3,4 @@ venv/
 target/
 src/main/resources/base/MIR/
 src/main/resources/base/spotify/
+**/__pycache__/
