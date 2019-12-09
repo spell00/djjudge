@@ -157,6 +157,23 @@ class ResBlock(nn.Module):
 
         return out
 
+class ResBlockDeconv(nn.Module):
+    def __init__(self, in_channel, channel):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose1d(in_channel, channel, 1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose1d(channel, in_channel, 3, padding=1),
+        )
+
+    def forward(self, input):
+        out = self.conv(input)
+        out += input
+
+        return out
+
 
 class ConvResnet(nn.Module):
     def __init__(self,
@@ -328,6 +345,141 @@ class ConvResnet(nn.Module):
                 x = self.final_activation(x)
             x, mu, log_var = self.GaussianSample.float()(x)
         return x, mu, log_var
+
+    def get_parameters(self):
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                print(name, param.data.shape)
+
+    def get_total_parameters(self):
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                print(name, param.data.shape)
+
+
+class DeconvResnet(nn.Module):
+    def __init__(self,
+                 in_channel,
+                 channel,
+                 n_res_block,
+                 n_res_channel,
+                 stride,
+                 activation,
+                 dense_layers_sizes,
+                 is_bns,
+                 is_dropouts,
+                 final_activation=None,
+                 drop_val=0.5,
+                 is_bayesian=False,
+                 random_node="output"
+                 ):
+        super().__init__()
+        self.is_bayesian = is_bayesian
+        self.blocks1 = ResBlockDeconv(channel, n_res_channel)
+        self.blocks2 = ResBlockDeconv(channel, n_res_channel)
+        self.blocks3 = ResBlockDeconv(channel, n_res_channel)
+        self.blocks4 = ResBlockDeconv(channel, n_res_channel)
+
+        self.blocks5 = nn.ConvTranspose1d(channel, channel, 3, padding=1)
+        self.blocks6 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks7 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks8 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks9 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks10 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks11 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks12 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks13 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks14 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks15 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks16 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks17 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks18 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks19 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks20 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks21 = nn.ConvTranspose1d(channel, channel, 4, stride=2, padding=1)
+        self.blocks22 = nn.ConvTranspose1d(channel, channel // 2, 4, stride=2, padding=1)
+        self.blocks23 = nn.ConvTranspose1d(channel // 2, in_channel, 4, stride=2, padding=1)
+        self.is_dropouts = is_dropouts
+        self.dropout = [[] for _ in dense_layers_sizes]
+        self.bns = [[] for _ in dense_layers_sizes]
+        self.linears = [[] for _ in dense_layers_sizes]
+        self.bn0 = torch.nn.BatchNorm1d(dense_layers_sizes[0])
+        self.is_bns = is_bns
+        for i in range(len(dense_layers_sizes)-1):
+            self.linears[i] = torch.nn.Linear(in_features=dense_layers_sizes[i], out_features=dense_layers_sizes[i+1]).to(device)
+            if self.is_bns[i] == 1:
+                self.bns[i] = torch.nn.BatchNorm1d(dense_layers_sizes[i]).to(device)
+            else:
+                self.bns[i] = None
+            if self.is_dropouts[i] == 1:
+                self.dropout[i] = nn.Dropout(drop_val).to(device)
+            else:
+                self.dropout[i] = None
+
+        self.activation = activation
+        self.final_activation = final_activation
+
+    def random_init(self, init_method=nn.init.xavier_normal_):
+        print("Random init")
+        for m in self.modules():
+            if isinstance(m, nn.Linear) or isinstance(m, nn.Conv1d) or isinstance(m, nn.ConvTranspose1d):
+                init_method(m.weight.data)
+                if m.bias is not None:
+                    m.bias.data.zero_()
+
+    def forward(self, x):
+        #for i, dense in enumerate(self.linears[:-1]):
+        x = self.linears[0](x.float())
+        x = self.activation(x)
+        x = x.unsqueeze(2)
+        x = self.blocks1(x)
+        x = self.activation(x)
+        x = self.blocks2(x)
+        x = self.activation(x)
+        x = self.blocks3(x)
+        x = self.activation(x)
+        x = self.blocks4(x)
+        x = self.activation(x)
+        x = self.blocks5(x)
+        x = self.activation(x)
+        x = self.blocks6(x)
+        x = self.activation(x)
+        x = self.blocks7(x)
+        x = self.activation(x)
+        x = self.blocks8(x)
+        x = self.activation(x)
+        x = self.blocks9(x)
+        x = self.activation(x)
+        x = self.blocks10(x)
+        x = self.activation(x)
+        x = self.blocks11(x)
+        x = self.activation(x)
+        x = self.blocks12(x)
+        x = self.activation(x)
+        x = self.blocks13(x)
+        x = self.activation(x)
+        x = self.blocks14(x)
+        x = self.activation(x)
+        x = self.blocks15(x)
+        x = self.activation(x)
+        x = self.blocks16(x)
+        x = self.activation(x)
+        x = self.blocks17(x)
+        x = self.activation(x)
+        x = self.blocks18(x)
+        x = self.activation(x)
+        x = self.blocks19(x)
+        x = self.activation(x)
+        x = self.blocks20(x)
+        x = self.activation(x)
+        x = self.blocks21(x)
+        x = self.activation(x)
+        x = self.blocks22(x)
+        x = self.activation(x)
+        x = self.blocks23(x)
+        if self.final_activation is not None:
+            x = self.final_activation(x)
+        return x
 
     def get_parameters(self):
         for name, param in self.named_parameters():

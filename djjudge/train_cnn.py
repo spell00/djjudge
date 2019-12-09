@@ -1,14 +1,14 @@
-from .models.supervised.CNN_1D import Simple1DCNN, ConvResnet
-from .utils.CycleAnnealScheduler import CycleScheduler
+from djjudge.models.supervised.CNN_1D import Simple1DCNN, ConvResnet
+from djjudge.utils.CycleAnnealScheduler import CycleScheduler
 from torch.utils.data import DataLoader
-from .data_preparation.load_wavs_as_tensor import Wave2tensor
+from djjudge.data_preparation.load_wavs_as_tensor import Wave2tensor
 import torch.nn as nn
 import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
-from .utils.utils import create_missing_folders
+from djjudge.utils.utils import create_missing_folders
 import math
 
 if torch.cuda.is_available():
@@ -124,7 +124,7 @@ def load_checkpoint(checkpoint_path, model, optimizer, fp16_run=False):
     epoch = checkpoint_dict['epoch']
     optimizer.load_state_dict(checkpoint_dict['optimizer'])
     model_for_loading = checkpoint_dict['model']
-    model.load_state_dict(model_for_loading.state_dict())
+    model.load_state_dict(model_for_loading)
     print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
     if fp16_run:
         from apex import amp
@@ -133,46 +133,14 @@ def load_checkpoint(checkpoint_path, model, optimizer, fp16_run=False):
     return model, optimizer, epoch
 
 
-def load_checkpoint_for_test(checkpoint_path, model):
-    assert os.path.isfile(checkpoint_path)
-    checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
-    model_for_loading = checkpoint_dict['model']
-    model.load_state_dict(model_for_loading.state_dict())
-    print("Loaded checkpoint '{}')".format(checkpoint_path))
-    return model
-
 
 def save_checkpoint(model, optimizer, learning_rate, epoch, filepath, channel, n_res_block, n_res_channel,
                     stride, dense_layers_size, is_bns, is_dropout, activation, final_activation, dropval, model_type,
                     is_bayesian, random_node):
     print("Saving model and optimizer state at epoch {} to {}".format(
         epoch, filepath))
-    if model_type == "convresnet":
-        model_for_saving = ConvResnet(in_channel=1,
-                                      channel=channel,
-                                      n_res_block=n_res_block,
-                                      n_res_channel=n_res_channel,
-                                      stride=stride,
-                                      dense_layers_sizes=dense_layers_size,
-                                      is_bns=is_bns,
-                                      is_dropouts=is_dropout,
-                                      activation=activation,
-                                      final_activation=final_activation,
-                                      drop_val=dropval,
-                                      is_bayesian=is_bayesian,
-                                      random_node=random_node).to(device)
-    else:
-        model_for_saving = Simple1DCNN(
-            activation=activation,
-            final_activation=final_activation,
-            drop_val=dropval,
-            is_bns=is_bns,
-            is_dropouts=is_dropout,
-            is_bayesian=is_bayesian
-        )
 
-    model_for_saving.load_state_dict(model.state_dict())
-    torch.save({'model': model_for_saving,
+    torch.save({'model': model.state_dict(),
                 'epoch': epoch,
                 'val_loss': epoch,
                 'optimizer': optimizer.state_dict(),
@@ -487,46 +455,3 @@ def train(training_folders,
                                   filename="scores_performance_valid_mle.png", n=20, valid=True)
         del loss_list
 
-
-"""
-training_folders = [
-    "C:/Users/simon/Documents/MIR/genres/blues/wav",
-    "C:/Users/simon/Documents/MIR/genres/classical/wav",
-    "C:/Users/simon/Documents/MIR/genres/country/wav",
-    "C:/Users/simon/Documents/MIR/genres/disco/wav",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/wav",
-    "C:/Users/simon/Documents/MIR/genres/jazz/wav",
-    "C:/Users/simon/Documents/MIR/genres/metal/wav",
-    "C:/Users/simon/Documents/MIR/genres/pop/wav",
-    "C:/Users/simon/Documents/MIR/genres/reggae/wav",
-    "C:/Users/simon/Documents/MIR/genres/rock/wav",
-]
-scores = [
-    "C:/Users/simon/Documents/MIR/genres/blues/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/classical/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/country/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/disco/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/hiphop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/jazz/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/metal/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/pop/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/reggae/scores.csv",
-    "C:/Users/simon/Documents/MIR/genres/rock/scores.csv",
-]
-output_directory = "C:/Users/simon/djjudge/"
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    num_gpus = torch.cuda.device_count()
-
-    torch.backends.cudnn.enabled = True
-    torch.backends.cudnn.benchmark = False
-    train(batch_size=16,
-          epochs=100000,
-          epochs_per_checkpoint=1,
-          learning_rate=1e-3,
-          fp16_run=True,
-          checkpoint_path="classif_ckpt/cnn_corr_normal_init")
-
-"""

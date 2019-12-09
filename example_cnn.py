@@ -1,5 +1,4 @@
 import torch
-# from djjudge.models.supervised.CNN_1D import *
 from djjudge.train_cnn import train
 from torch import nn
 if __name__ == "__main__":
@@ -37,10 +36,10 @@ if __name__ == "__main__":
     train(training_folders,
           scores,
           output_directory,
-          batch_size=4,
+          batch_size=8,
           epochs=1000,
           epochs_per_checkpoint=1,
-          learning_rate=3e-4,
+          learning_rate=1e-4,
           fp16_run=False,
           checkpoint_name="classif_ckpt/cnn_corr_bayesian_v3",
           is_bns=[1, 1],
@@ -56,5 +55,5 @@ if __name__ == "__main__":
           is_bayesian=True,
           init_method=nn.init.kaiming_uniform_,
           random_node="last",
-          get_mle=True
+          get_mle=False
           )

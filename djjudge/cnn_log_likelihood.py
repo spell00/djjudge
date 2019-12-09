@@ -33,7 +33,7 @@ if __name__ == "__main__":
                        n_res_block=4,
                        n_res_channel=256,
                        stride=4,
-                       dense_layers_sizes=[256, 32, 1],
+                       dense_layers_sizes=[256, 128, 1],
                        is_bns=[1, 1],
                        is_dropouts=[1, 1],
                        activation=nn.PReLU(),
@@ -42,12 +42,11 @@ if __name__ == "__main__":
                        is_bayesian=True,
                        random_node="last"
                        ).to(device)
-    dense_layers_sizes = [256, 32, 1]
 
     checkpoint_dict = torch.load(checkpoint_path, map_location='cpu')
     epoch = checkpoint_dict['epoch']
     model_for_loading = checkpoint_dict['model']
-    model.load_state_dict(model_for_loading.state_dict())
+    model.load_state_dict(model_for_loading)
     print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
     predict_set = Wave2tensor(spotify, scores_files=None, segment_length=300000, all=True, valid=False, pred=True)
     songs_list = predict_set.audio_files
@@ -105,6 +104,11 @@ if __name__ == "__main__":
     performance_per_score(torch.mean(ys, 1).view(-1).sort()[0].detach().cpu(), results_path='figures', filename="all_scores_predicted.png")
 
     performance_per_score(torch.Tensor(log_likelihoods).view(-1).sort()[0].detach().cpu(), results_path='figures', filename="all_nll_performance_predicted.png")
+
+    dataframe_worst_predictions.to_csv("dataframe_worst_predictions")
+    dataframe_best_predictions.to_csv("dataframe_best_predictions")
+    dataframe_best_scores.to_csv("dataframe_best_scores")
+    dataframe_worst_scores.to_csv("dataframe_worst_scores")
 
     # TODO put GUI here!
     # TODO inputs:
